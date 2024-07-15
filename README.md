@@ -1,23 +1,49 @@
 # fluid_sim_nn
 
-particle based fluid sim -> grid based fluid sim via neural nets
+A neural network-based approach to convert particle-based fluid simulations to grid-based fluid simulations.
 
-download [meson](https://mesonbuild.com/)
+## Prerequisites
 
+Before you begin, ensure you have [Meson](https://mesonbuild.com/) installed on your system.
 
-WINDOWS:
+## Building and Running
 
-cd sim
+### Windows
 
-for debug build:
+Navigate to the `sim` directory and follow these steps:
+
+#### Debug Build
+
+```powershell
 meson setup builddir --backend=vs --vsenv
 meson compile -C builddir
 .\builddir\fluid_sim.exe
+```
 
-for release build:
+#### Release Build
+
+```powershell
 meson setup builddir_release --backend=vs --vsenv --buildtype=release
 meson compile -C builddir_release
 .\builddir_release\fluid_sim.exe
+```
 
-LINUX:
-idk probably similar, but no custom backend or vsenv stuff
+### Linux
+
+Navigate to the `sim` directory and follow these steps:
+
+#### Debug Build
+
+```bash
+meson setup builddir
+meson compile -C builddir
+./builddir/fluid_sim
+```
+
+#### Release Build
+
+```bash
+meson setup builddir_release --buildtype=release
+meson compile -C builddir_release
+./builddir_release/fluid_sim
+```
