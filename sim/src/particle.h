@@ -11,6 +11,10 @@ struct Particle
   glm::vec2 pos{};
   glm::vec2 old_pos{};
   glm::vec2 vel{};
+  glm::vec2 old_vel{};
+
+  glm::vec2 pos_k[4];
+  glm::vec2 vel_k[4];
   float mass{1.0f};
 
   Particle(glm::vec2 spawn, std::random_device &rd, float init_mass, float init_vel)
@@ -26,5 +30,6 @@ struct Particle
     glm::mat2 rot = glm::mat2(glm::cos(dis_vel_dir(gen)), -glm::sin(dis_vel_dir(gen)),
                               glm::sin(dis_vel_dir(gen)), glm::cos(dis_vel_dir(gen)));
     vel = rot * vel;
+    old_vel = vel;
   }
 };
