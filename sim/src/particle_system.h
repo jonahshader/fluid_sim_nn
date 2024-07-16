@@ -15,6 +15,8 @@ public:
 
   const std::vector<Particle> &get_particles() const { return particles; }
 
+  const glm::vec2 &get_bounds() const { return bounds; }
+
   void grab(const glm::vec2 &pos, float radius, float strength);
 
   void spin(const glm::vec2 &pos, float radius, float strength);
@@ -28,13 +30,13 @@ private:
   std::vector<float> pressure{};
   std::vector<glm::vec2> pressure_grad{};
   std::vector<glm::vec2> acceleration{};
-  std::vector<glm::vec2> old_pos{};
+  std::vector<glm::vec2> viscosity_forces{};
 
   void iterate_neighbors(int idx, const std::function<void(int i, int idx)> &callback);
 
   // assumes sorted, computations are done in parallel.
   void compute_attribute(const std::function<float(float r)> &kernel,
-                         const std::function<float(int idx)> &getter, const std::function<void(float, int)> &setter);
+                         const std::function<float(int idx, int i)> &getter, const std::function<void(float, int)> &setter);
 
   void compute_attribute_grad(const std::function<float(float r)> &kernel_derivative,
                               const std::function<float(int idx, int i)> &getter, const std::function<void(const glm::vec2 &, int index)> &setter);

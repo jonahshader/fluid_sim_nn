@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
   SDL_Surface *surface;
   SDL_Event event;
 
-  ParticleSystem particles({512.0f, 720.0f}, {1280.0f, 720.0f}, 3000, 1.0f, 0.0f, 24.0f);
+  ParticleSystem particles({64.0f * 16.0f / 9.0f, 64.0f}, {64.0f * 16.0f / 9.0f, 64.0f}, 12000, 1.0f, 0.0f, 2.0f);
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0)
   {
@@ -80,30 +80,37 @@ int main(int argc, char *argv[])
     SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
     SDL_RenderClear(renderer);
 
+    // calculate render_scale so that the bounds fit the screen
+    int screen_width, screen_height;
+    SDL_GetWindowSize(window, &screen_width, &screen_height);
+    auto bounds = particles.get_bounds();
+    float render_scale = std::min(screen_width / bounds.x, screen_height / bounds.y);
+
+    // calculate mouse world position
+    int mouse_x, mouse_y;
+    SDL_GetMouseState(&mouse_x, &mouse_y);
+    glm::vec2 mouse_world_pos = {mouse_x / render_scale, mouse_y / render_scale};
+
+    constexpr float TOOL_RADIUS = 8.0f;
+
     // grab
     if (mouse_left_down)
     {
-      int x, y;
-      SDL_GetMouseState(&x, &y);
-      particles.grab({(float)x, (float)y}, 128.0f, 10.0f);
+      particles.grab(mouse_world_pos, TOOL_RADIUS, 5.0f);
     }
     else if (mouse_right_down)
     {
-      int x, y;
-      SDL_GetMouseState(&x, &y);
-      particles.grab({(float)x, (float)y}, 128.0f, -10.0f);
+      particles.grab(mouse_world_pos, TOOL_RADIUS, -10.0f);
     }
 
     // spin
     if (mouse_middle_down)
     {
-      int x, y;
-      SDL_GetMouseState(&x, &y);
-      particles.spin({(float)x, (float)y}, 256.0f, 3.0f);
+      particles.spin(mouse_world_pos, TOOL_RADIUS / 2, 1.0f);
     }
 
-    particles.update(1 / 165.0f);
-    render(particles, renderer);
+    particles.update(0.3f / 165.0f);
+    render(particles, renderer, render_scale);
 
     SDL_RenderPresent(renderer);
   }

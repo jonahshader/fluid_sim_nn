@@ -9,6 +9,7 @@
 struct Particle
 {
   glm::vec2 pos{};
+  glm::vec2 old_pos{};
   glm::vec2 vel{};
   float mass{1.0f};
 
@@ -20,6 +21,7 @@ struct Particle
     std::uniform_real_distribution<float> dis_y(0.0f, spawn.y);
     std::uniform_real_distribution<float> dis_vel_dir(0.0f, 2.0f * M_PI_F);
     pos = glm::vec2(dis_x(gen), dis_y(gen));
+    old_pos = pos;
     vel = glm::vec2(init_vel, 0.0f);
     glm::mat2 rot = glm::mat2(glm::cos(dis_vel_dir(gen)), -glm::sin(dis_vel_dir(gen)),
                               glm::sin(dis_vel_dir(gen)), glm::cos(dis_vel_dir(gen)));

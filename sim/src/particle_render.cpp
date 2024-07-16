@@ -1,6 +1,6 @@
 #include "particle_render.h"
 
-void render(const ParticleSystem &ps, SDL_Renderer *renderer)
+void render(const ParticleSystem &ps, SDL_Renderer *renderer, float render_scale)
 {
   // batch render particles
   static std::vector<SDL_Point> points;
@@ -9,7 +9,9 @@ void render(const ParticleSystem &ps, SDL_Renderer *renderer)
   const auto &particles = ps.get_particles();
   for (const auto &particle : particles)
   {
-    SDL_Point point = {static_cast<int>(particle.pos.x), static_cast<int>(particle.pos.y)};
+    SDL_Point point = {
+        static_cast<int>(particle.pos.x * render_scale),
+        static_cast<int>(particle.pos.y * render_scale)};
     points.push_back(point);
     point.x++;
     points.push_back(point);
