@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
   SDL_Surface *surface;
   SDL_Event event;
 
-  ParticleSystem particles({64.0f * 16.0f / 9.0f, 64.0f}, {64.0f * 16.0f / 9.0f, 64.0f}, 12000, 1.0f, 0.0f, 2.0f);
+  ParticleSystem particles({64.0f * 16.0f / 9.0f, 48.0f}, {64.0f * 16.0f / 9.0f, 64.0f}, 8000, 1.0f, 0.0f, 2.5f);
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0)
   {
@@ -92,24 +92,26 @@ int main(int argc, char *argv[])
     glm::vec2 mouse_world_pos = {mouse_x / render_scale, mouse_y / render_scale};
 
     constexpr float TOOL_RADIUS = 8.0f;
+    constexpr float DT = 2.5f / 165.0f;
 
     // grab
     if (mouse_left_down)
     {
-      particles.grab(mouse_world_pos, TOOL_RADIUS, 5.0f);
+      particles.grab(mouse_world_pos, TOOL_RADIUS, 800.0f * DT);
     }
     else if (mouse_right_down)
     {
-      particles.grab(mouse_world_pos, TOOL_RADIUS, -10.0f);
+      particles.grab(mouse_world_pos, TOOL_RADIUS, -1000.0f * DT);
     }
 
     // spin
     if (mouse_middle_down)
     {
-      particles.spin(mouse_world_pos, TOOL_RADIUS / 2, 1.0f);
+      particles.spin(mouse_world_pos, TOOL_RADIUS / 1.5f, 100.0f * DT);
     }
 
-    particles.update(0.3f / 165.0f);
+    // particles.update(0.3f / 165.0f);
+    particles.update_rk4(DT);
     render(particles, renderer, render_scale);
 
     SDL_RenderPresent(renderer);
