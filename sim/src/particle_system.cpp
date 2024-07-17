@@ -7,8 +7,9 @@
 // idx is the outer loop index, i is the inner loop index
 // TODO: this sucks, just use i and j
 
-constexpr float PRESSURE_MULTIPLIER = 40000.0f;
-constexpr float VISCOSITY_MULTIPLIER = 24.0f;
+constexpr float PRESSURE_MULTIPLIER = 60000.0f;
+constexpr float VISCOSITY_MULTIPLIER = 8.0f;
+constexpr float TARGET_PRESSURE = 5.0f;
 
 ParticleSystem::ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, float init_vel, float kernel_radius)
     : bounds(bounds), kernel_radius(kernel_radius)
@@ -58,7 +59,7 @@ void ParticleSystem::update(float dt)
   compute_attribute_grad(sharp_kernel_derivative, [&](int idx, int i)
                          { 
                           float shared_density = (densities[i] + densities[idx]) * 0.5f;
-                          float pressure = (shared_density - 3.0f) * PRESSURE_MULTIPLIER;
+                          float pressure = (shared_density - TARGET_PRESSURE) * PRESSURE_MULTIPLIER;
                           // if (pressure < 0.0f)
                           //   pressure *= 0.25f;
                           return pressure; }, [&](const glm::vec2 &grad, int i)
@@ -137,7 +138,7 @@ void ParticleSystem::rk4_partial_step(float dt,
   compute_attribute_grad(sharp_kernel_derivative, [&](int idx, int i)
                          { 
                           float shared_density = (densities[i] + densities[idx]) * 0.5f;
-                          float pressure = (shared_density - 3.0f) * PRESSURE_MULTIPLIER;
+                          float pressure = (shared_density - TARGET_PRESSURE) * PRESSURE_MULTIPLIER;
                           // if (pressure < 0.0f)
                           //   pressure *= 0.25f;
                           return pressure; }, [&](const glm::vec2 &grad, int i)
