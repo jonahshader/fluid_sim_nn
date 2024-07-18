@@ -16,8 +16,10 @@ public:
   void add(const SoilParticle &p);
 
   const std::vector<SoilCell> &get_grid() const { return grid; }
-
   const std::vector<SoilCell> get_neighbors(const glm::vec2 &pos) const;
+  float get_cell_size() const { return cell_size; }
+  int get_grid_width() const { return grid_width; }
+  int get_grid_height() const { return grid_height; }
 
 private:
   std::vector<SoilCell> grid{};

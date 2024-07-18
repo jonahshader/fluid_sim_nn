@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-constexpr float MAX_SOIL_PARTICLE_RADIUS = 32.0f;
+constexpr float MAX_SOIL_PARTICLE_RADIUS = 2.0f;
 
 Soil::Soil(const glm::vec2 &region, float kernel_size) : cell_size(kernel_size + MAX_SOIL_PARTICLE_RADIUS)
 {

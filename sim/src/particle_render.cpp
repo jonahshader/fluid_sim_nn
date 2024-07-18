@@ -75,4 +75,22 @@ void render_soil(const Soil &soil, SDL_Renderer *renderer, float render_scale)
       }
     }
   }
+
+  // render grid
+  SDL_SetRenderDrawColor(renderer, 127, 127, 127, 255);
+  auto grid_width = soil.get_grid_width();
+  auto grid_height = soil.get_grid_height();
+  auto cell_size = soil.get_cell_size();
+  for (int y = 0; y < grid_height; ++y)
+  {
+    for (int x = 0; x < grid_width; ++x)
+    {
+      SDL_Rect rect = {
+          x * cell_size * render_scale,
+          y * cell_size * render_scale,
+          cell_size * render_scale,
+          cell_size * render_scale};
+      SDL_RenderDrawRect(renderer, &rect);
+    }
+  }
 }
