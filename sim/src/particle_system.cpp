@@ -9,7 +9,7 @@
 
 constexpr float PRESSURE_MULTIPLIER = 1200000.0f;
 constexpr float VISCOSITY_MULTIPLIER = 8.0f;
-constexpr float TARGET_PRESSURE = 4.0f;
+constexpr float TARGET_PRESSURE = 2.0f;
 
 ParticleSystem::ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, float init_vel, float kernel_radius)
     : bounds(bounds), kernel_radius(kernel_radius)
