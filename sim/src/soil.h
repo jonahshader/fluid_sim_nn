@@ -17,7 +17,7 @@ public:
 
   const std::vector<SoilCell> &get_grid() const { return grid; }
 
-  const std::vector<SoilCell> &get_neighbors(const glm::vec2 &pos);
+  const std::vector<SoilCell> get_neighbors(const glm::vec2 &pos) const;
 
 private:
   std::vector<SoilCell> grid{};

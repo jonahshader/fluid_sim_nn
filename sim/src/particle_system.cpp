@@ -7,9 +7,9 @@
 // idx is the outer loop index, i is the inner loop index
 // TODO: this sucks, just use i and j
 
-constexpr float PRESSURE_MULTIPLIER = 60000.0f;
+constexpr float PRESSURE_MULTIPLIER = 1200000.0f;
 constexpr float VISCOSITY_MULTIPLIER = 8.0f;
-constexpr float TARGET_PRESSURE = 5.0f;
+constexpr float TARGET_PRESSURE = 4.0f;
 
 ParticleSystem::ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, float init_vel, float kernel_radius)
     : bounds(bounds), kernel_radius(kernel_radius)
@@ -110,7 +110,8 @@ void ParticleSystem::rk4_partial_step(float dt,
                                       std::function<glm::vec2(const Particle &)> get_pos,
                                       std::function<glm::vec2(const Particle &)> get_vel,
                                       std::function<void(Particle &, const glm::vec2 &)> set_pos_deriv,
-                                      std::function<void(Particle &, const glm::vec2 &)> set_vel_deriv)
+                                      std::function<void(Particle &, const glm::vec2 &)> set_vel_deriv,
+                                      const Soil &soil)
 {
   // build sharp and smooth kernels
   auto smooth_kernel = make_smoothstep_kernel(kernel_radius);
@@ -183,12 +184,35 @@ void ParticleSystem::rk4_partial_step(float dt,
       acc.y += WALL_ACCEL_PER_DIST * (bounds.y - particles[i].pos.y);
     }
 
+    // accelerate towards soil particle boundary
+    auto cells = soil.get_neighbors(particles[i].pos);
+    for (const auto &cell : cells)
+    {
+      for (const auto &soil_particle : cell)
+      {
+        auto dir = soil_particle.pos - particles[i].pos;
+        float r = glm::length(dir);
+        float adhesion_amount = (r - soil_particle.radius) / soil_particle.adhesion_radius;
+        if (std::abs(adhesion_amount) <= 1.0f)
+        {
+          if (adhesion_amount < 0)
+          {
+            acc -= soil_particle.adhesion * dir / r;
+          }
+          else
+          {
+            acc += soil_particle.adhesion * adhesion_amount * dir / r;
+          }
+        }
+      }
+    }
+
     set_pos_deriv(particles[i], particles[i].vel);
     set_vel_deriv(particles[i], acc);
   }
 }
 
-void ParticleSystem::update_rk4(float dt)
+void ParticleSystem::update_rk4(const Soil &soil, float dt)
 {
   // copy over old positions and velocities
 #pragma omp parallel for
@@ -209,7 +233,7 @@ void ParticleSystem::update_rk4(float dt)
   { p.vel_k[0] = vel_deriv; };
 
   // first RK4 step
-  rk4_partial_step(dt, get_pos_0, get_vel_0, set_pos_deriv_0, set_vel_deriv_0);
+  rk4_partial_step(dt, get_pos_0, get_vel_0, set_pos_deriv_0, set_vel_deriv_0, soil);
 
   // build getters/setters for second RK4 step
   // we use old_pos and old_vel because we want the original, unmodified values
@@ -223,7 +247,7 @@ void ParticleSystem::update_rk4(float dt)
   { p.vel_k[1] = vel_deriv; };
 
   // second RK4 step
-  rk4_partial_step(dt, get_pos_1, get_vel_1, set_pos_deriv_1, set_vel_deriv_1);
+  rk4_partial_step(dt, get_pos_1, get_vel_1, set_pos_deriv_1, set_vel_deriv_1, soil);
 
   // build getters/setters for third RK4 step
   auto get_pos_2 = [dt](const Particle &p)
@@ -236,7 +260,7 @@ void ParticleSystem::update_rk4(float dt)
   { p.vel_k[2] = vel_deriv; };
 
   // third RK4 step
-  rk4_partial_step(dt, get_pos_2, get_vel_2, set_pos_deriv_2, set_vel_deriv_2);
+  rk4_partial_step(dt, get_pos_2, get_vel_2, set_pos_deriv_2, set_vel_deriv_2, soil);
 
   // build getters/setters for fourth RK4 step
   auto get_pos_3 = [dt](const Particle &p)
@@ -249,7 +273,7 @@ void ParticleSystem::update_rk4(float dt)
   { p.vel_k[3] = vel_deriv; };
 
   // fourth RK4 step
-  rk4_partial_step(dt, get_pos_3, get_vel_3, set_pos_deriv_3, set_vel_deriv_3);
+  rk4_partial_step(dt, get_pos_3, get_vel_3, set_pos_deriv_3, set_vel_deriv_3, soil);
 
   // update positions, velocities
 #pragma omp parallel for

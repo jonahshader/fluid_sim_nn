@@ -58,10 +58,10 @@ int main(int argc, char *argv[])
     auto bounds = particles.get_bounds();
     float render_scale = std::min(screen_width / bounds.x, screen_height / bounds.y);
 
-    constexpr float DT = 1.0f / 165.0f;
+    constexpr float DT = 0.25f / 165.0f;
     tools.update(event, render_scale, DT);
     // particles.update(0.3f / 165.0f);
-    particles.update_rk4(DT);
+    particles.update_rk4(soil, DT);
     render_soil(soil, renderer, render_scale);
     render_velocity(particles, renderer, render_scale);
     tools.render(renderer, render_scale);

@@ -39,7 +39,7 @@ SoilCell *Soil::get_cell(const glm::vec2 &pos)
   }
 }
 
-const std::vector<SoilCell> &Soil::get_neighbors(const glm::vec2 &pos)
+const std::vector<SoilCell> Soil::get_neighbors(const glm::vec2 &pos) const
 {
   std::vector<SoilCell> neighbors;
   int cell_x = static_cast<int>(std::floor(pos.x / cell_size));

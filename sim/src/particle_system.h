@@ -5,6 +5,7 @@
 #include "glm/glm.hpp"
 
 #include "particle.h"
+#include "soil.h"
 
 class ParticleSystem
 {
@@ -12,7 +13,7 @@ public:
   ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, float init_vel, float kernel_radius);
 
   void update(float dt);
-  void update_rk4(float dt);
+  void update_rk4(const Soil &soil, float dt);
 
   const std::vector<Particle> &get_particles() const { return particles; }
   const glm::vec2 &get_bounds() const { return bounds; }
@@ -48,5 +49,6 @@ private:
                         std::function<glm::vec2(const Particle &)> get_pos,
                         std::function<glm::vec2(const Particle &)> get_vel,
                         std::function<void(Particle &, const glm::vec2 &)> set_pos,
-                        std::function<void(Particle &, const glm::vec2 &)> set_vel);
+                        std::function<void(Particle &, const glm::vec2 &)> set_vel,
+                        const Soil &soil);
 };
