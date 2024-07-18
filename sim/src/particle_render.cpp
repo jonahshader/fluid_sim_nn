@@ -39,7 +39,11 @@ void render_velocity(const ParticleSystem &ps, SDL_Renderer *renderer, float ren
       vel /= vel_len;
       vel_len = 1.0f;
     }
-    SDL_SetRenderDrawColor(renderer, 255 * vel_len, 255 * (1.0f - vel_len), 0, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           255 * vel_len,
+                           255 * (1.0f - vel_len),
+                           0,
+                           255);
     // use rectangles instead of points for better visibility
     SDL_Rect rect = {
         static_cast<int>(particle.pos.x * render_scale),
@@ -47,5 +51,28 @@ void render_velocity(const ParticleSystem &ps, SDL_Renderer *renderer, float ren
         static_cast<int>(render_scale * 0.5f),
         static_cast<int>(render_scale * 0.5f)};
     SDL_RenderFillRect(renderer, &rect);
+  }
+}
+
+void render_soil(const Soil &soil, SDL_Renderer *renderer, float render_scale)
+{
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  for (const auto &cell : soil.get_grid())
+  {
+    for (const auto &particle : cell)
+    {
+      // render a circle at the radius
+      glm::vec2 pos = particle.pos * render_scale;
+      float radius = particle.radius * render_scale;
+      // use a 16 sided polygon to approximate a circle
+      glm::vec2 last_p = pos + glm::vec2{radius, 0.0f};
+      for (int i = 0; i <= 16; ++i)
+      {
+        float angle = i / 16.0f * 2.0f * M_PI;
+        glm::vec2 p = pos + glm::vec2{std::cos(angle), std::sin(angle)} * radius;
+        SDL_RenderDrawLine(renderer, last_p.x, last_p.y, p.x, p.y);
+        last_p = p;
+      }
+    }
   }
 }

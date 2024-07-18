@@ -10,6 +10,6 @@ if build_machine.system() == 'windows'
   deps += [dependency('sdl2main')]
 endif
 
-src = ['src/main.cpp', 'src/particle.cpp', 'src/particle_system.cpp', 'src/particle_render.cpp']
+src = ['src/main.cpp', 'src/particle.cpp', 'src/particle_system.cpp', 'src/particle_render.cpp', 'src/tools.cpp', 'src/soil.cpp']
 # add win_subsystem: 'windows' to remove console window on windows
 executable('fluid_sim', src, dependencies: deps)

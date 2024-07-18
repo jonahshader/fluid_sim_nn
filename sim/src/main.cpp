@@ -3,12 +3,10 @@
 
 #include "particle_system.h"
 #include "particle_render.h"
+#include "soil.h"
+#include "tools.h"
 
 #include <iostream>
-
-bool mouse_left_down = false;
-bool mouse_right_down = false;
-bool mouse_middle_down = false;
 
 int main(int argc, char *argv[])
 {
@@ -17,8 +15,11 @@ int main(int argc, char *argv[])
   SDL_Renderer *renderer;
   SDL_Surface *surface;
   SDL_Event event;
-
-  ParticleSystem particles({64.0f * 16.0f / 9.0f, 48.0f}, {64.0f * 16.0f / 9.0f, 64.0f}, 7000, 1.0f, 0.0f, 2.0f);
+  constexpr float KERNEL_RADIUS = 2.0f;
+  glm::vec2 bounds = {64.0f * 16.0f / 9.0f, 64.0f};
+  ParticleSystem particles({64.0f * 16.0f / 9.0f, 48.0f}, bounds, 7000, 1.0f, 0.0f, KERNEL_RADIUS);
+  Soil soil(bounds, KERNEL_RADIUS);
+  Tools tools(soil, particles);
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0)
   {
@@ -47,36 +48,7 @@ int main(int argc, char *argv[])
     {
       break;
     }
-    else if (event.type == SDL_MOUSEBUTTONDOWN)
-    {
-      if (event.button.button == SDL_BUTTON_LEFT)
-      {
-        mouse_left_down = true;
-      }
-      else if (event.button.button == SDL_BUTTON_RIGHT)
-      {
-        mouse_right_down = true;
-      }
-      else if (event.button.button == SDL_BUTTON_MIDDLE)
-      {
-        mouse_middle_down = true;
-      }
-    }
-    else if (event.type == SDL_MOUSEBUTTONUP)
-    {
-      if (event.button.button == SDL_BUTTON_LEFT)
-      {
-        mouse_left_down = false;
-      }
-      else if (event.button.button == SDL_BUTTON_RIGHT)
-      {
-        mouse_right_down = false;
-      }
-      else if (event.button.button == SDL_BUTTON_MIDDLE)
-      {
-        mouse_middle_down = false;
-      }
-    }
+
     SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
     SDL_RenderClear(renderer);
 
@@ -86,33 +58,13 @@ int main(int argc, char *argv[])
     auto bounds = particles.get_bounds();
     float render_scale = std::min(screen_width / bounds.x, screen_height / bounds.y);
 
-    // calculate mouse world position
-    int mouse_x, mouse_y;
-    SDL_GetMouseState(&mouse_x, &mouse_y);
-    glm::vec2 mouse_world_pos = {mouse_x / render_scale, mouse_y / render_scale};
-
-    constexpr float TOOL_RADIUS = 8.0f;
     constexpr float DT = 1.0f / 165.0f;
-
-    // grab
-    if (mouse_left_down)
-    {
-      particles.grab(mouse_world_pos, TOOL_RADIUS, 800.0f * DT);
-    }
-    else if (mouse_right_down)
-    {
-      particles.grab(mouse_world_pos, TOOL_RADIUS, -1000.0f * DT);
-    }
-
-    // spin
-    if (mouse_middle_down)
-    {
-      particles.spin(mouse_world_pos, TOOL_RADIUS / 1.5f, 100.0f * DT);
-    }
-
+    tools.update(event, render_scale, DT);
     // particles.update(0.3f / 165.0f);
     particles.update_rk4(DT);
+    render_soil(soil, renderer, render_scale);
     render_velocity(particles, renderer, render_scale);
+    tools.render(renderer, render_scale);
 
     SDL_RenderPresent(renderer);
   }

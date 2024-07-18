@@ -1,9 +1,10 @@
 #pragma once
 
 #include <vector>
-#include <optional>
 
 #include "soil_particle.h"
+
+using SoilCell = std::vector<SoilParticle>;
 
 class Soil
 {
@@ -14,11 +15,15 @@ public:
 
   void add(const SoilParticle &p);
 
+  const std::vector<SoilCell> &get_grid() const { return grid; }
+
+  const std::vector<SoilCell> &get_neighbors(const glm::vec2 &pos);
+
 private:
-  std::vector<std::vector<SoilParticle>> grid{};
+  std::vector<SoilCell> grid{};
   float cell_size;
   int grid_width{};
   int grid_height{};
 
-  std::optional<std::vector<SoilParticle> &> get_cell(const glm::vec2 &pos);
+  SoilCell *get_cell(const glm::vec2 &pos);
 };
