@@ -186,6 +186,8 @@ void ParticleSystem::rk4_partial_step(float dt,
 
     // accelerate towards soil particle boundary
     auto cells = soil.get_neighbors(particles[i].pos);
+    glm::vec2 cell_acc{0.0f, 0.0f};
+    float max_adhesion = 0.0f;
     for (const auto &cell : cells)
     {
       for (const auto &soil_particle : cell)
@@ -193,18 +195,53 @@ void ParticleSystem::rk4_partial_step(float dt,
         auto dir = soil_particle.pos - particles[i].pos;
         float r = glm::length(dir);
         float adhesion_amount = (r - soil_particle.radius) / soil_particle.adhesion_radius;
-        if (std::abs(adhesion_amount) <= 1.0f)
+        // if (std::abs(adhesion_amount) <= 1.0f)
+        // {
+        //   if (adhesion_amount < 0)
+        //   {
+        //     // inside
+        //     acc -= soil_particle.adhesion * dir / r;
+        //   }
+        //   else
+        //   {
+        //     // outside
+        //     acc += soil_particle.adhesion * adhesion_amount * dir / r;
+        //   }
+        // }
+
+        // if (adhesion_amount > 0)
+        // {
+        //   acc += soil_particle.adhesion * adhesion_amount * dir / r;
+        // }
+        // else
+        // {
+        //   acc += soil_particle.adhesion * adhesion_amount * dir / r;
+        // }
+
+        if (adhesion_amount < 1)
         {
-          if (adhesion_amount < 0)
+          cell_acc += soil_particle.adhesion * adhesion_amount * dir / r;
+          if (soil_particle.adhesion > max_adhesion)
           {
-            acc -= soil_particle.adhesion * dir / r;
-          }
-          else
-          {
-            acc += soil_particle.adhesion * adhesion_amount * dir / r;
+            max_adhesion = soil_particle.adhesion;
           }
         }
       }
+    }
+
+    // ensure cell_acc magnitude is less than max_adhesion
+    float cell_acc_mag = glm::length(cell_acc);
+    if (cell_acc_mag > max_adhesion)
+    {
+      cell_acc *= max_adhesion / cell_acc_mag;
+    }
+
+    acc += cell_acc;
+
+    // add drag proportional to velocity if particle is in soil
+    if (cell_acc_mag > 0.0f)
+    {
+      acc -= 5.0f * particles[i].vel;
     }
 
     set_pos_deriv(particles[i], particles[i].vel);
