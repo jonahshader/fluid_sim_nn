@@ -8,6 +8,19 @@
 
 #include <iostream>
 
+const glm::vec2 bounds = {128.0f, 128.0f};
+const glm::vec2 spawn = {64.0f, 64.0f};
+
+constexpr float KERNEL_RADIUS = 2.0f;
+constexpr int PARTICLES = 7000;
+constexpr float PARTICLE_MASS = 1.0f;
+
+void init_sim(ParticleSystem &particles, Soil &soil)
+{
+  particles = ParticleSystem(spawn, bounds, PARTICLES, PARTICLE_MASS, 0.0f, KERNEL_RADIUS);
+  soil = Soil(bounds, KERNEL_RADIUS);
+}
+
 int main(int argc, char *argv[])
 {
   std::cout << "program start" << std::endl;
@@ -15,11 +28,11 @@ int main(int argc, char *argv[])
   SDL_Renderer *renderer;
   SDL_Surface *surface;
   SDL_Event event;
-  constexpr float KERNEL_RADIUS = 2.0f;
-  glm::vec2 bounds = {64.0f * 16.0f / 9.0f, 64.0f};
-  ParticleSystem particles({64.0f * 16.0f / 9.0f, 48.0f}, bounds, 7000, 1.0f, 0.0f, KERNEL_RADIUS);
+  ParticleSystem particles(spawn, bounds, PARTICLES, PARTICLE_MASS, 0.0f, KERNEL_RADIUS);
   Soil soil(bounds, KERNEL_RADIUS);
   Tools tools(soil, particles);
+
+  bool paused = false;
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0)
   {
@@ -48,6 +61,17 @@ int main(int argc, char *argv[])
     {
       break;
     }
+    if (event.type == SDL_KEYDOWN)
+    {
+      if (event.key.keysym.sym == SDLK_SPACE)
+      {
+        paused = !paused;
+      }
+      else if (event.key.keysym.sym == SDLK_r)
+      {
+        init_sim(particles, soil);
+      }
+    }
 
     SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
     SDL_RenderClear(renderer);
@@ -60,8 +84,12 @@ int main(int argc, char *argv[])
 
     constexpr float DT = 0.25f / 165.0f;
     tools.update(event, render_scale, DT);
-    // particles.update(0.3f / 165.0f);
-    particles.update_rk4(soil, DT);
+    if (!paused)
+    {
+      // particles.update(0.3f / 165.0f);
+      particles.update_rk4(soil, DT);
+    }
+
     render_soil(soil, renderer, render_scale);
     render_velocity(particles, renderer, render_scale);
     tools.render(renderer, render_scale);

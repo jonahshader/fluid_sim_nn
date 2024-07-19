@@ -59,16 +59,38 @@ Tools::Tools(Soil &soil, ParticleSystem &particles)
                        particles.spin(pos, radius, force * dt);
                      } },
                    render_circle});
-
   tools.push_back({"Add Soil Particle", [&](const MouseState &mouse_state, const SDL_Event &event, float dt)
                    {
-                     if (mouse_state.left_button_down)
-                     {
-                       glm::vec2 pos = mouse_state.mouse_world_pos;
-                       float radius = get_radius(mouse_state);
-                       soil.add({pos, radius});
-                     } },
-                   render_circle});
+                    if (event.type == SDL_MOUSEBUTTONDOWN)
+                    {
+                      if (event.button.button == SDL_BUTTON_LEFT)
+                      {
+                        glm::vec2 pos = mouse_state.mouse_world_pos;
+                        float radius = get_radius(mouse_state);
+                        soil.add({pos, radius});
+                      }
+                    } }, render_circle});
+  tools.push_back({"Add Soil Patch", [&](const MouseState &mouse_state, const SDL_Event &event, float dt)
+                   {
+                    if (event.type == SDL_MOUSEBUTTONDOWN)
+                    {
+                      if (event.button.button == SDL_BUTTON_LEFT)
+                      {
+                        glm::vec2 start_pos = mouse_state.mouse_world_pos;
+                        float radius = get_radius(mouse_state);
+                        float spacing = 2.0f * radius;
+                        // place in hex grid
+                        for (int y = -5; y <= 5; ++y)
+                        {
+                          for (int x = -5; x <= 5; ++x)
+                          {
+                            float offset = y % 2 == 0 ? 0.0f : spacing * 0.5f;
+                            glm::vec2 pos = start_pos + glm::vec2{x * spacing + offset, y * spacing};
+                            soil.add({pos, radius});
+                          }
+                        }
+                      }
+                    } }, render_circle});
 }
 
 void Tools::update(const SDL_Event &event, float render_scale, float dt)
