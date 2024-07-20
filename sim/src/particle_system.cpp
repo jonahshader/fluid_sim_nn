@@ -7,10 +7,6 @@
 // idx is the outer loop index, i is the inner loop index
 // TODO: this sucks, just use i and j
 
-constexpr float PRESSURE_MULTIPLIER = 1200000.0f;
-constexpr float VISCOSITY_MULTIPLIER = 8.0f;
-constexpr float TARGET_PRESSURE = 2.0f;
-
 ParticleSystem::ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, float init_vel, float kernel_radius)
     : bounds(bounds), kernel_radius(kernel_radius)
 {
@@ -220,7 +216,16 @@ void ParticleSystem::rk4_partial_step(float dt,
 
         if (adhesion_amount < 1)
         {
-          cell_acc += soil_particle.adhesion * adhesion_amount * dir / r;
+          if (adhesion_amount > 0)
+          {
+            cell_acc += soil_particle.adhesion * adhesion_amount * dir / r;
+          }
+          else
+          {
+            // stronger when inside
+            cell_acc += 1024 * soil_particle.adhesion * adhesion_amount * dir / r;
+          }
+
           if (soil_particle.adhesion > max_adhesion)
           {
             max_adhesion = soil_particle.adhesion;
@@ -447,5 +452,46 @@ void ParticleSystem::compute_density_grad(const std::function<float(float r)> &k
                         dir /= r;
                         density_grad += particles[i].mass * kernel_derivative(r) * dir; });
     densities_grad[particle_index] = density_grad;
+  }
+}
+
+void ParticleSystem::populate_bins(Bins &bins_)
+{
+  auto &bins = bins_.bins;
+  auto bin_size = bins_.bin_size;
+  const auto &start = bins_.start;
+  auto width = bins_.width;
+  auto height = bins_.height;
+
+  ++bins_.samples;
+
+  const float bin_area = bin_size * bin_size;
+
+  // init empty bins
+  if (bins.size() != width * height)
+  {
+    bins.clear();
+    for (int i = 0; i < width * height; ++i)
+    {
+      bins.emplace_back();
+    }
+  }
+
+  // iterate through particles, identify bins that they contribute to, then add contribution
+  for (const auto &p : particles)
+  {
+    // add to the bin that the particle is in
+    int x_bin = std::floor((p.pos.x - start.x) / bin_size);
+    int y_bin = std::floor((p.pos.y - start.y) / bin_size);
+    if (x_bin >= 0 && x_bin < width && y_bin >= 0 && y_bin < height)
+    {
+      auto &bin = bins[y_bin * width + x_bin];
+      bin.particles += 1;
+      bin.density += p.mass / bin_area;
+      bin.vel += p.vel;
+      auto p_vel = glm::length(p.vel);
+      bin.avg_vel += p_vel;
+      bin.kinetic_energy += 0.5f * p.mass * p_vel * p_vel;
+    }
   }
 }

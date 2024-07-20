@@ -1,11 +1,17 @@
 #pragma once
 
 #include <functional>
+#include <vector>
 
 #include "glm/glm.hpp"
 
 #include "particle.h"
 #include "soil.h"
+#include "bin.h"
+
+constexpr float PRESSURE_MULTIPLIER = 1200000.0f;
+constexpr float VISCOSITY_MULTIPLIER = 8.0f;
+constexpr float TARGET_PRESSURE = 2.0f;
 
 class ParticleSystem
 {
@@ -14,6 +20,8 @@ public:
 
   void update(float dt);
   void update_rk4(const Soil &soil, float dt);
+
+  void populate_bins(Bins &bins_);
 
   const std::vector<Particle> &get_particles() const { return particles; }
   const glm::vec2 &get_bounds() const { return bounds; }

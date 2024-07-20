@@ -94,3 +94,49 @@ void render_soil(const Soil &soil, SDL_Renderer *renderer, float render_scale)
     }
   }
 }
+
+void render_bins(const Bins &bins, SDL_Renderer *renderer, float render_scale)
+{
+  if (bins.bins.empty())
+  {
+    return;
+  }
+  for (int y = 0; y < bins.height; ++y)
+  {
+    for (int x = 0; x < bins.width; ++x)
+    {
+      const auto &bin = bins.bins[y * bins.width + x];
+      float normalized_density = bin.density / (2 * TARGET_PRESSURE);
+
+      float r = normalized_density;
+      float g = normalized_density;
+      float b = normalized_density;
+
+      // color based on velocity
+      auto vel = bin.vel * 0.025f;
+      float vel_len = glm::length(vel);
+      if (vel_len > 1.0f)
+      {
+        vel /= vel_len;
+        vel_len = 1.0f;
+      }
+      float vel_r = 0.5f + 0.5f * vel.x;
+      float vel_g = 0.5f + 0.5f * vel.y;
+      r *= vel_r;
+      g *= vel_g;
+
+      // just use grey scale for now
+      SDL_SetRenderDrawColor(renderer,
+                             255 * r,
+                             255 * g,
+                             255 * b,
+                             255);
+      SDL_Rect rect = {
+          static_cast<int>((bins.start.x + x * bins.bin_size) * render_scale),
+          static_cast<int>((bins.start.y + y * bins.bin_size) * render_scale),
+          static_cast<int>(bins.bin_size * render_scale),
+          static_cast<int>(bins.bin_size * render_scale)};
+      SDL_RenderFillRect(renderer, &rect);
+    }
+  }
+}

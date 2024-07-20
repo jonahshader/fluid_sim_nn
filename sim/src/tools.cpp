@@ -72,21 +72,28 @@ Tools::Tools(Soil &soil, ParticleSystem &particles)
                     } }, render_circle});
   tools.push_back({"Add Soil Patch", [&](const MouseState &mouse_state, const SDL_Event &event, float dt)
                    {
+                    constexpr float ADHESION_RADIUS = 0.75f;
                     if (event.type == SDL_MOUSEBUTTONDOWN)
                     {
                       if (event.button.button == SDL_BUTTON_LEFT)
                       {
                         glm::vec2 start_pos = mouse_state.mouse_world_pos;
                         float radius = get_radius(mouse_state);
-                        float spacing = 2.0f * radius;
+                        float spacing = (2.0f * radius) + ADHESION_RADIUS * 1.5f;
                         // place in hex grid
                         for (int y = -5; y <= 5; ++y)
                         {
                           for (int x = -5; x <= 5; ++x)
                           {
                             float offset = y % 2 == 0 ? 0.0f : spacing * 0.5f;
-                            glm::vec2 pos = start_pos + glm::vec2{x * spacing + offset, y * spacing};
-                            soil.add({pos, radius});
+                            glm::vec2 pos = start_pos + glm::vec2{x * spacing + offset, y * spacing / std::sqrt(3.0f/2.0f)};
+
+                            SoilParticle p;
+                            // TODO: use named parameters
+                            p.pos = pos;
+                            p.radius = radius;
+                            p.adhesion_radius = ADHESION_RADIUS;
+                            soil.add(p);
                           }
                         }
                       }
