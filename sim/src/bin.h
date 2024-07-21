@@ -22,10 +22,16 @@ struct Bin
 
   void compute_average(int samples)
   {
-    vel /= particles;
-    avg_vel /= particles;
-    kinetic_energy /= particles;
-    density /= samples;
+    if (particles > 0)
+    {
+      vel /= particles;
+      avg_vel /= particles;
+      kinetic_energy /= particles;
+    }
+    if (samples > 0)
+    {
+      density /= samples;
+    }
   }
 };
 
@@ -94,7 +100,7 @@ struct Bins
     file << "}\n";
   }
 
-  void write_to_file(const std::filesystem::path &path, int batch)
+  void write_to_file(const std::filesystem::path &path, int frame)
   {
     // the channels we want to record are vel, avg_vel, kinetic_energy, density
 
@@ -102,7 +108,7 @@ struct Bins
     // (batch, channels, height, width)
     // batch = 1, channels = 6, height = bins.height, width = bins.width
 
-    std::ofstream file(path / ("batch_" + std::to_string(batch) + ".bin"), std::ios::binary);
+    std::ofstream file(path / ("frame_" + std::to_string(frame) + ".bin"), std::ios::binary);
     // pytorch is row major, so our outer loop should be channels
 
     // vel_x

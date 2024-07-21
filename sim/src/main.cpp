@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 
   bool paused = true;
   bool recording = false;
-  int batch = 0;
+  int frame = 0;
 
   // we are in fluid_sim_nn/sim/, and we want to save
   // to fluid_sim_nn/data/
@@ -128,9 +128,9 @@ int main(int argc, char *argv[])
         bins.print_stats();
         if (recording)
         {
-          bins.write_to_file(data_dir, batch);
-          ++batch;
+          bins.write_to_file(data_dir, frame);
         }
+        ++frame;
         bins_render = bins;
         bins.reset();
       }
