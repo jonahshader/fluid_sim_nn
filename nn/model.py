@@ -5,9 +5,10 @@ import inspect
 
 
 class SimpleCNN(nn.Module):
-  def __init__(self, channels):
+  def __init__(self, channels, inference=False):
     super(SimpleCNN, self).__init__()
-    self.conv = nn.Conv2d(channels, 32, kernel_size=3)  # no padding
+    self.conv = nn.Conv2d(channels, 32, kernel_size=3,
+                          padding_mode='circular' if inference else 'none', padding=1 if inference else 'none')  # no padding
     self.act1 = nn.GELU()
     # fc1 is pixel-wise, so the input is 32
     self.conv2 = nn.Conv2d(32, 32, kernel_size=1)
@@ -21,9 +22,6 @@ class SimpleCNN(nn.Module):
     x = self.conv2(x)
     x = self.act2(x)
     x = self.conv3(x)
-
-    # print(x.shape)
-    # print(y.shape)
 
     if y is not None:
       # compute the loss
@@ -62,15 +60,3 @@ class SimpleCNN(nn.Module):
     print(f"using fused AdamW: {use_fused}")
 
     return optimizer
-
-  # def get_num_params(self):
-  #   """
-  #   Return the number of parameters in the model.
-  #   """
-  #   n_params = sum(p.numel() for p in self.parameters())
-  #   return n_params
-
-  # def estimate_mfu(self, batch_size, dt):
-  #   """ estimate model flops utilization (MFU) in units of RTX 2070 SUPER float32 peak FLOPS."""
-  #   # first estimate the number of flops we do per iteration.
-  #   N = self.get_num_params()
