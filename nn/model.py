@@ -5,23 +5,42 @@ import inspect
 
 
 class SimpleCNN(nn.Module):
-  def __init__(self, channels, inference=False):
+  def __init__(self, channels, top_kernel_size, skip_con=False, inference=False):
     super(SimpleCNN, self).__init__()
-    self.conv = nn.Conv2d(channels, 32, kernel_size=3,
-                          padding_mode='circular' if inference else 'none', padding=1 if inference else 'none')  # no padding
+    self.top_kernel_size = top_kernel_size
+    self.inference = inference
+    if inference:
+      self.conv = nn.Conv2d(channels, 32, kernel_size=top_kernel_size,
+                            padding_mode='circular', padding=1)
+    else:
+      self.conv = nn.Conv2d(
+          channels, 32, kernel_size=top_kernel_size, padding=0)
+
     self.act1 = nn.GELU()
     # fc1 is pixel-wise, so the input is 32
     self.conv2 = nn.Conv2d(32, 32, kernel_size=1)
     self.act2 = nn.GELU()
     self.conv3 = nn.Conv2d(32, channels, kernel_size=1)
+    self.skip_con = skip_con
 
   def forward(self, x, y=None):
+    x_orig = x
     # result should be (batch, channels, height-2, width-2)
     x = self.conv(x)
     x = self.act1(x)
     x = self.conv2(x)
     x = self.act2(x)
     x = self.conv3(x)
+
+    # skip connection
+    if self.skip_con:
+      if not self.inference:
+        # crop the original x to match the size of the new x
+        # using top_kernel_size
+        crop_amount = (self.top_kernel_size - 1) // 2
+        x_orig = x_orig[:, :, crop_amount:-
+                        crop_amount, crop_amount:-crop_amount]
+      x = x + x_orig
 
     if y is not None:
       # compute the loss

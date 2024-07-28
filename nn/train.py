@@ -20,7 +20,7 @@ from data import load_data, split_data, crop_data
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
-out_dir = 'out'
+
 eval_interval = 200
 log_interval = 10
 eval_iters = 20
@@ -28,20 +28,17 @@ eval_only = False  # if True, script exits right after the first eval
 always_save_checkpoint = True  # if True, always save a checkpoint after each eval
 init_from = 'scratch'  # 'scratch' or 'resume'
 # wandb logging
-wandb_log = False  # disabled by default
+wandb_log = True  # disabled by default
 wandb_project = 'fluid_sim_nn'
 wandb_run_name = 'run' + str(time.time())
+model_type = SimpleCNN
+out_dir = 'out_' + model_type.__name__
 # data
-dataset = 'small_1'
-batch_size = 32
+dataset = '2_long'
+batch_size = 256
 # model
-# TODO: modify to be relevant to the fluid simulation model
-
-# n_layer = 12
-# n_head = 12
-# n_embd = 768
-# dropout = 0.0  # for pretraining 0 is good, for finetuning try 0.1+
-# bias = False  # do we use bias inside LayerNorm and Linear layers?
+top_kernel_size = 3
+skip_con = True
 
 # adamw optimizer
 learning_rate = 6e-4  # max learning rate
@@ -74,8 +71,12 @@ config = {k: globals()[k] for k in config_keys}  # will be useful for logging
 master_process = True
 seed_offset = 0
 
+# output at ../models/out_dir
+full_out_dir = os.path.join(os.path.dirname(__file__), '..', 'models', out_dir)
 if master_process:
-  os.makedirs(out_dir, exist_ok=True)
+  os.makedirs(full_out_dir, exist_ok=True)
+
+
 torch.manual_seed(1337 + seed_offset)
 torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
 torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
@@ -91,8 +92,9 @@ ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
 # current dir is fluid_sim_nn/nn, data is in fluid_sim_nn/data/{dataset}
 data_dir = os.path.join(os.path.dirname(__file__), '..', 'data', dataset)
 metadata, X, Y, normalize_transform = load_data(data_dir)
-# TODO: crop_size depends on kernel size, should be a parameter
-X, Y = crop_data(X, Y, crop_size=(2, 2))
+# crop_size depends on kernel size
+crop_amount = top_kernel_size - 1
+X, Y = crop_data(X, Y, crop_size=(crop_amount, crop_amount))
 # normalize the data
 X = normalize_transform(X)
 Y = normalize_transform(Y)
@@ -129,16 +131,17 @@ if os.path.exists(meta_path):
 
 # model init
 # start with model_args from command line
-model_args = dict(channels=len(metadata['attributes']))
+model_args = dict(channels=len(
+    metadata['attributes']), top_kernel_size=top_kernel_size, skip_con=skip_con)
 if init_from == 'scratch':
   # init a new model from scratch
   print("Initializing a new model from scratch")
   # determine the vocab size we'll use for from-scratch training
-  model = SimpleCNN(**model_args)
+  model = model_type(**model_args)
 elif init_from == 'resume':
-  print(f"Resuming training from {out_dir}")
+  print(f"Resuming training from {full_out_dir}")
   # resume training from a checkpoint.
-  ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+  ckpt_path = os.path.join(full_out_dir, 'ckpt.pt')
   checkpoint = torch.load(ckpt_path, map_location=device)
   checkpoint_model_args = checkpoint['model_args']
   # force these config attributes to be equal otherwise we can't even resume training
@@ -146,7 +149,7 @@ elif init_from == 'resume':
   for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
     model_args[k] = checkpoint_model_args[k]
   # create the model
-  model = SimpleCNN(**model_args)
+  model = model_type(**model_args)
   state_dict = checkpoint['model']
   # fix the keys of the state dictionary :(
   # honestly no idea how checkpoints sometimes get this prefix, have to debug more
@@ -249,8 +252,8 @@ while True:
             'best_val_loss': best_val_loss,
             'config': config,
         }
-        print(f"saving checkpoint to {out_dir}")
-        torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+        print(f"saving checkpoint to {full_out_dir}")
+        torch.save(checkpoint, os.path.join(full_out_dir, 'ckpt.pt'))
   if iter_num == 0 and eval_only:
     break
 

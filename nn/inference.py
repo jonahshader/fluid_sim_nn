@@ -2,15 +2,12 @@
 Test fluid sim nn with initial conditions from dataset.
 """
 import os
-import pickle
 import pygame
 from contextlib import nullcontext
 import torch
-from pathlib import Path
 from model import SimpleCNN
 from data import load_data
 from render_state import render_state
-import ast
 
 out_dir = 'out'
 device = 'cuda'
@@ -26,7 +23,8 @@ device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
 # init from a model saved in a specific directory
 ckpt_path = os.path.join(out_dir, 'ckpt.pt')
 checkpoint = torch.load(ckpt_path, map_location=device)
-model = SimpleCNN(**checkpoint['model_args'], inference=True)
+model = SimpleCNN(**checkpoint['model_args'],
+                  inference=True, top_kernel_size=3)
 
 
 state_dict = checkpoint['model']
@@ -65,6 +63,12 @@ if __name__ == '__main__':
   running = True
   state = X[0].unsqueeze(0)
   state.requires_grad = False
+  # get the initial global properties
+  total_x_y = (state[0][0] ** 2 + state[0][1] ** 2).sqrt().sum()
+  total_avg_velocity = state[0][2].sum()
+  total_kinetic_energy = state[0][3].sum()
+  total_density = state[0][4].sum()
+
   # extend the width and height of the state with zeros to match the screen
   state = torch.nn.functional.pad(state, (0, 256 - width, 0, 256 - height))
   with torch.set_grad_enabled(False):
@@ -74,10 +78,30 @@ if __name__ == '__main__':
           running = False
       screen.fill((0, 0, 0))
       state, _ = model(state)
-      surface = render_state(state)
+      # fix the density, kinetic energy, avg vel
+      current_total_density = state[0][4].sum()
+      current_total_kinetic_energy = state[0][3].sum()
+      current_avg_velocity = state[0][2].sum()
+      # state[0][4] *= total_density / current_total_density
+      # state[0][3] *= total_kinetic_energy / current_total_kinetic_energy
+      # state[0][2] *= total_avg_velocity / current_avg_velocity
+
+      # fix the x, y squared
+      # current_total_x_y = (state[0][0] ** 2 + state[0][1] ** 2).sqrt().sum()
+      # state[0][0] *= total_x_y / current_total_x_y
+      # state[0][1] *= total_x_y / current_total_x_y
+
+      # # limit the x y velocity to -1, 1
+      # state[0][0] = torch.clamp(state[0][0], -1, 1)
+      # state[0][1] = torch.clamp(state[0][1], -1, 1)
+
+      # state[0][0] = torch.sigmoid(state[0][0])
+      # state[0][1] = torch.sigmoid(state[0][1])
+
+      surface = render_state(state[:, 2:])
       screen.blit(surface, (0, 0))
       # screen is larger than surface, so scale up
       pygame.transform.scale(surface, (1024, 1024), screen)
 
       pygame.display.flip()
-      clock.tick(60)
+      clock.tick(15)

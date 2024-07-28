@@ -10,12 +10,16 @@
 #include <filesystem>
 #include <iostream>
 
+#include <string>
+
 const glm::vec2 bounds = {128.0f, 128.0f};
 const glm::vec2 spawn = {64.0f, 64.0f};
 
 constexpr float KERNEL_RADIUS = 2.0f;
 constexpr int PARTICLES = 7000;
 constexpr float PARTICLE_MASS = 1.0f;
+
+const std::string DATA_DIR = "2_long";
 
 void init_sim(ParticleSystem &particles, Soil &soil)
 {
@@ -50,8 +54,9 @@ int main(int argc, char *argv[])
   int frame = 0;
 
   // we are in fluid_sim_nn/sim/, and we want to save
-  // to fluid_sim_nn/data/
-  std::filesystem::path data_dir = std::filesystem::current_path().parent_path() / "data";
+  // to fluid_sim_nn/data/DATA_DIR
+  std::filesystem::path data_dir = std::filesystem::current_path().parent_path() / "data" / DATA_DIR;
+  std::filesystem::create_directories(data_dir);
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0)
   {
