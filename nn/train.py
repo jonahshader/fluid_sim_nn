@@ -13,7 +13,7 @@ from contextlib import nullcontext
 
 import torch
 
-from model import SimpleCNN
+from model import SimpleCNN, configure_optimizers
 from data import load_data, split_data, crop_data
 
 
@@ -166,8 +166,8 @@ model.to(device)
 scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
 
 # optimizer
-optimizer = model.configure_optimizers(
-    weight_decay, learning_rate, (beta1, beta2), device_type)
+optimizer = configure_optimizers(
+    model, weight_decay, learning_rate, (beta1, beta2), device_type)
 if init_from == 'resume':
   optimizer.load_state_dict(checkpoint['optimizer'])
 checkpoint = None  # free up memory
