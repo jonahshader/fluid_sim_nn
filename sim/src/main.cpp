@@ -13,17 +13,18 @@
 #include <string>
 
 const glm::vec2 bounds = {128.0f, 128.0f};
-const glm::vec2 spawn = {64.0f, 64.0f};
+const glm::vec2 spawn = bounds;
 
 constexpr float KERNEL_RADIUS = 2.0f;
 constexpr int PARTICLES = 7000;
 constexpr float PARTICLE_MASS = 1.0f;
+const glm::vec2 INIT_VEL = {0.0f, -100.0f};
 
-const std::string DATA_DIR = "2_long";
+const std::string DATA_DIR = "3_wrap";
 
 void init_sim(ParticleSystem &particles, Soil &soil)
 {
-  particles = ParticleSystem(spawn, bounds, PARTICLES, PARTICLE_MASS, 0.0f, KERNEL_RADIUS);
+  particles = ParticleSystem(spawn, bounds, PARTICLES, PARTICLE_MASS, INIT_VEL, KERNEL_RADIUS);
   soil = Soil(bounds, KERNEL_RADIUS);
 }
 
@@ -34,16 +35,20 @@ int main(int argc, char *argv[])
   SDL_Renderer *renderer;
   SDL_Surface *surface;
   SDL_Event event;
-  ParticleSystem particles(spawn, bounds, PARTICLES, PARTICLE_MASS, 0.0f, KERNEL_RADIUS);
+  ParticleSystem particles(spawn, bounds, PARTICLES, PARTICLE_MASS, INIT_VEL, KERNEL_RADIUS);
   Soil soil(bounds, KERNEL_RADIUS);
   Tools tools(soil, particles);
   long tick = 0;
 
-  float bin_size = KERNEL_RADIUS * 4;
-  float bins_x_start = bin_size * 2;
-  float bins_y_start = bin_size * 2;
-  float bins_x_end = bounds.x - bin_size * 2;
-  float bins_y_end = bounds.y - bin_size * 2;
+  float bin_size = KERNEL_RADIUS * 2;
+  // float bins_x_start = bin_size * 2;
+  // float bins_y_start = bin_size * 2;
+  // float bins_x_end = bounds.x - bin_size * 2;
+  // float bins_y_end = bounds.y - bin_size * 2;
+  float bins_x_start = 0;
+  float bins_y_start = 0;
+  float bins_x_end = bounds.x;
+  float bins_y_end = bounds.y;
   int bins_x = std::floor((bins_x_end - bins_x_start) / bin_size);
   int bins_y = std::floor((bins_y_end - bins_y_start) / bin_size);
   Bins bins{bin_size, {bins_x_start, bins_y_start}, bins_x, bins_y};
@@ -127,7 +132,7 @@ int main(int argc, char *argv[])
       particles.update_rk4(soil, DT);
       ++tick;
       particles.populate_bins(bins);
-      if (tick % 4 == 0)
+      // if (tick % 2 == 0)
       {
         bins.compute_averages();
         bins.print_stats();
@@ -141,9 +146,9 @@ int main(int argc, char *argv[])
       }
     }
 
+    render_bins(bins_render, renderer, render_scale);
     render_soil(soil, renderer, render_scale);
     render_velocity(particles, renderer, render_scale);
-    render_bins(bins_render, renderer, render_scale);
     tools.render(renderer, render_scale);
 
     SDL_RenderPresent(renderer);

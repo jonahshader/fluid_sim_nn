@@ -16,7 +16,7 @@ constexpr float TARGET_PRESSURE = 2.0f;
 class ParticleSystem
 {
 public:
-  ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, float init_vel, float kernel_radius);
+  ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, glm::vec2 init_vel, float kernel_radius);
 
   void update(float dt);
   void update_rk4(const Soil &soil, float dt);

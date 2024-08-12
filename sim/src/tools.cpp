@@ -89,7 +89,6 @@ Tools::Tools(Soil &soil, ParticleSystem &particles)
                             glm::vec2 pos = start_pos + glm::vec2{x * spacing + offset, y * spacing / std::sqrt(3.0f/2.0f)};
 
                             SoilParticle p;
-                            // TODO: use named parameters
                             p.pos = pos;
                             p.radius = radius;
                             p.adhesion_radius = ADHESION_RADIUS;

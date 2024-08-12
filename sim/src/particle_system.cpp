@@ -8,7 +8,7 @@
 // idx is the outer loop index, i is the inner loop index
 // TODO: this sucks, just use i and j
 
-ParticleSystem::ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, float init_vel, float kernel_radius)
+ParticleSystem::ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_particles, float init_mass, glm::vec2 init_vel, float kernel_radius)
     : bounds(bounds), kernel_radius(kernel_radius)
 {
   std::random_device rd;
