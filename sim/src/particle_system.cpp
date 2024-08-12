@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "kernels.h"
+#include "custom_math.h"
 
 // idx is the outer loop index, i is the inner loop index
 // TODO: this sucks, just use i and j
@@ -13,7 +14,7 @@ ParticleSystem::ParticleSystem(glm::vec2 spawn, glm::vec2 bounds, size_t num_par
   std::random_device rd;
   for (size_t i = 0; i < num_particles; i++)
   {
-    particles.push_back(Particle(spawn, rd, init_mass, init_vel));
+    particles.push_back(Particle(spawn, rd, init_mass, init_vel, kernel_radius));
     densities.push_back(0.0f);
     densities_grad.emplace_back(0.0f, 0.0f);
     pressure.push_back(0.0f);
@@ -53,7 +54,7 @@ void ParticleSystem::update(float dt)
   compute_density(sharp_kernel);
   // compute pressure for each particle
   compute_attribute_grad(sharp_kernel_derivative, [&](int idx, int i)
-                         { 
+                         {
                           float shared_density = (densities[i] + densities[idx]) * 0.5f;
                           float pressure = (shared_density - TARGET_PRESSURE) * PRESSURE_MULTIPLIER;
                           // if (pressure < 0.0f)
@@ -67,7 +68,7 @@ void ParticleSystem::update(float dt)
   {
     glm::vec2 viscosity_force = glm::vec2(0.0f, 0.0f);
     iterate_neighbors(i, [&](int j, int i)
-                      { 
+                      {
                         auto r = glm::length(particles[i].pos - particles[j].pos);
                         float influence = smooth_kernel(r);
                         viscosity_force += (particles[j].vel - particles[i].vel) * influence; });
@@ -117,7 +118,6 @@ void ParticleSystem::rk4_partial_step(float dt,
 
   // update positions, velocities
   // TODO: allow for skipping this on the first step, since get_pos, get_vel will not manipulate pos, vel
-#pragma omp parallel for
   for (int i = 0; i < particles.size(); ++i)
   {
     particles[i].pos = get_pos(particles[i]);
@@ -133,7 +133,7 @@ void ParticleSystem::rk4_partial_step(float dt,
   compute_density(sharp_kernel);
   // compute pressure for each particle
   compute_attribute_grad(sharp_kernel_derivative, [&](int idx, int i)
-                         { 
+                         {
                           float shared_density = (densities[i] + densities[idx]) * 0.5f;
                           float pressure = (shared_density - TARGET_PRESSURE) * PRESSURE_MULTIPLIER;
                           // if (pressure < 0.0f)
@@ -147,8 +147,8 @@ void ParticleSystem::rk4_partial_step(float dt,
   {
     glm::vec2 viscosity_force = glm::vec2(0.0f, 0.0f);
     iterate_neighbors(i, [&](int j, int i)
-                      { 
-                        auto r = glm::length(particles[i].pos - particles[j].pos);
+                      {
+                        auto r = glm::length(calculate_wrapped_distance(particles[i].pos, particles[j].pos));
                         float influence = smooth_kernel(r);
                         viscosity_force += (particles[j].vel - particles[i].vel) * influence; });
     viscosity_forces[i] = VISCOSITY_MULTIPLIER * viscosity_force;
@@ -160,25 +160,7 @@ void ParticleSystem::rk4_partial_step(float dt,
     glm::vec2 acc{};
     acc -= pressure_grad[i] / densities[i];
     acc += viscosity_forces[i] / densities[i];
-    acc.y += 208.0f;
-
-    constexpr float WALL_ACCEL_PER_DIST = 6600.0f;
-    if (particles[i].pos.x < 0.0f)
-    {
-      acc.x += WALL_ACCEL_PER_DIST * -particles[i].pos.x;
-    }
-    else if (particles[i].pos.x > bounds.x)
-    {
-      acc.x += WALL_ACCEL_PER_DIST * (bounds.x - particles[i].pos.x);
-    }
-    if (particles[i].pos.y < 0.0f)
-    {
-      acc.y += WALL_ACCEL_PER_DIST * -particles[i].pos.y;
-    }
-    else if (particles[i].pos.y > bounds.y)
-    {
-      acc.y += WALL_ACCEL_PER_DIST * (bounds.y - particles[i].pos.y);
-    }
+    acc.y += 108.0f;
 
     // accelerate towards soil particle boundary
     auto cells = soil.get_neighbors(particles[i].pos);
@@ -191,28 +173,6 @@ void ParticleSystem::rk4_partial_step(float dt,
         auto dir = soil_particle.pos - particles[i].pos;
         float r = glm::length(dir);
         float adhesion_amount = (r - soil_particle.radius) / soil_particle.adhesion_radius;
-        // if (std::abs(adhesion_amount) <= 1.0f)
-        // {
-        //   if (adhesion_amount < 0)
-        //   {
-        //     // inside
-        //     acc -= soil_particle.adhesion * dir / r;
-        //   }
-        //   else
-        //   {
-        //     // outside
-        //     acc += soil_particle.adhesion * adhesion_amount * dir / r;
-        //   }
-        // }
-
-        // if (adhesion_amount > 0)
-        // {
-        //   acc += soil_particle.adhesion * adhesion_amount * dir / r;
-        // }
-        // else
-        // {
-        //   acc += soil_particle.adhesion * adhesion_amount * dir / r;
-        // }
 
         if (adhesion_amount < 1)
         {
@@ -321,7 +281,8 @@ void ParticleSystem::update_rk4(const Soil &soil, float dt)
 #pragma omp parallel for
   for (int i = 0; i < particles.size(); ++i)
   {
-    particles[i].pos = particles[i].old_pos + (dt / 6.0f) * (particles[i].pos_k[0] + 2.0f * particles[i].pos_k[1] + 2.0f * particles[i].pos_k[2] + particles[i].pos_k[3]);
+    glm::vec2 new_pos = particles[i].old_pos + (dt / 6.0f) * (particles[i].pos_k[0] + 2.0f * particles[i].pos_k[1] + 2.0f * particles[i].pos_k[2] + particles[i].pos_k[3]);
+    particles[i].pos = wrap_position(new_pos);
     particles[i].vel = particles[i].old_vel + (dt / 6.0f) * (particles[i].vel_k[0] + 2.0f * particles[i].vel_k[1] + 2.0f * particles[i].vel_k[2] + particles[i].vel_k[3]);
   }
 }
@@ -356,39 +317,34 @@ void ParticleSystem::iterate_neighbors(int idx,
 
   const auto &p = particles[idx].pos;
 
-  for (int i = idx - 1; i >= 0; --i)
+  for (int i = idx - 1; true; --i)
   {
-    const auto &other_p = particles[i].pos;
-    if (p.x - other_p.x > kernel_radius)
+    int i_wrap = wrap(i, particles.size());
+    const auto &other_p = particles[i_wrap].pos;
+    const auto dist = calculate_wrapped_distance(other_p, p);
+    if (abs(dist.x) > kernel_radius)
       break;
 
-    float r = glm::length(other_p - p);
+    float r = glm::length(dist);
     if (r < kernel_radius && r >= 1e-6f)
-      callback(i, idx);
+      callback(i_wrap, idx);
   }
 
-  for (int i = idx; i < particles.size(); ++i)
+  for (int i = idx; true; ++i)
   {
-    const auto &other_p = particles[i].pos;
-    if (other_p.x - p.x > kernel_radius)
+    int i_wrap = wrap(i, particles.size());
+    const auto &other_p = particles[i_wrap].pos;
+    const auto dist = calculate_wrapped_distance(other_p, p);
+    if (abs(dist.x) > kernel_radius)
       break;
 
-    float r = glm::length(other_p - p);
+    float r = glm::length(dist);
     if (r < kernel_radius && r >= 1e-6f)
-      callback(i, idx);
+      callback(i_wrap, idx);
   }
-
-  // for (int i = 0; i < particles.size(); ++i)
-  // {
-  //   const auto &other_p = particles[i];
-  //   if (i == idx)
-  //     continue;
-  //   float r = glm::length(other_p.pos - p.pos);
-  //   if (r < kernel_radius && r >= 1e-6f)
-  //     callback(i, idx, r, (p.pos - other_p.pos) / r);
-  // }
 }
 
+// TODO: dead code?
 void ParticleSystem::compute_attribute(
     const std::function<float(float r)> &kernel,
     const std::function<float(int idx, int i)> &getter, const std::function<void(float, int index)> &setter)
@@ -398,8 +354,8 @@ void ParticleSystem::compute_attribute(
   {
     float attribute = 0.0f;
     iterate_neighbors(idx, [&](int i, int idx)
-                      { 
-                        float r = glm::length(particles[idx].pos - particles[i].pos);
+                      {
+                        float r = glm::length(calculate_wrapped_distance(particles[idx].pos, particles[i].pos));
                         attribute += particles[idx].mass * getter(idx, i) * kernel(r) / densities[i]; });
     setter(attribute, idx);
   }
@@ -414,8 +370,8 @@ void ParticleSystem::compute_attribute_grad(
   {
     glm::vec2 attribute_grad = glm::vec2(0.0f, 0.0f);
     iterate_neighbors(idx, [&](int i, int idx)
-                      { 
-                        auto dir = particles[idx].pos - particles[i].pos;
+                      {
+                        auto dir = calculate_wrapped_distance(particles[i].pos, particles[idx].pos);
                         float r = glm::length(dir);
                         dir /= r;
                         attribute_grad += particles[i].mass * getter(idx, i) * kernel_derivative(r) * dir / densities[i]; });
@@ -430,8 +386,8 @@ void ParticleSystem::compute_density(const std::function<float(float r)> &kernel
   {
     float density = 0.0f;
     iterate_neighbors(idx, [&](int i, int idx)
-                      { 
-                        float r = glm::length(particles[idx].pos - particles[i].pos);
+                      {
+                        float r = glm::length(calculate_wrapped_distance(particles[idx].pos, particles[i].pos));
                         density += particles[i].mass * kernel(r); });
     // have to add the particle's own mass, since it is dropped from the neighbor loop due to r < 1e-6f
     density += particles[idx].mass * kernel(0.0f);
@@ -446,8 +402,8 @@ void ParticleSystem::compute_density_grad(const std::function<float(float r)> &k
   {
     glm::vec2 density_grad = glm::vec2(0.0f, 0.0f);
     iterate_neighbors(particle_index, [&](int i, int idx)
-                      { 
-                        auto dir = particles[idx].pos - particles[i].pos;
+                      {
+                        auto dir = calculate_wrapped_distance(particles[i].pos, particles[idx].pos);
                         float r = glm::length(dir);
                         dir /= r;
                         density_grad += particles[i].mass * kernel_derivative(r) * dir; });
@@ -494,4 +450,25 @@ void ParticleSystem::populate_bins(Bins &bins_)
       bin.kinetic_energy += 0.5f * p.mass * p_vel * p_vel;
     }
   }
+}
+
+glm::vec2 ParticleSystem::wrap_position(const glm::vec2 &pos)
+{
+  return glm::vec2(
+      fmod(pos.x + bounds.x, bounds.x),
+      fmod(pos.y + bounds.y, bounds.y));
+}
+
+glm::vec2 ParticleSystem::calculate_wrapped_distance(const glm::vec2 &pos1, const glm::vec2 &pos2)
+{
+  glm::vec2 diff = pos2 - pos1;
+  if (diff.x > bounds.x / 2)
+    diff.x -= bounds.x;
+  else if (diff.x < -bounds.x / 2)
+    diff.x += bounds.x;
+  if (diff.y > bounds.y / 2)
+    diff.y -= bounds.y;
+  else if (diff.y < -bounds.y / 2)
+    diff.y += bounds.y;
+  return diff;
 }

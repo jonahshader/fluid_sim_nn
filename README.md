@@ -28,6 +28,8 @@ meson compile -C builddir_release
 .\builddir_release\fluid_sim.exe
 ```
 
+If you get any issues with cl.exe, you can try running the commands from the Developer Command Prompt for Visual Studio. Just don't use the `--vsenv` flag.
+
 ### Linux
 
 Navigate to the `sim` directory and follow these steps:

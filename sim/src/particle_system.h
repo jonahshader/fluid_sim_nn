@@ -59,4 +59,8 @@ private:
                         std::function<void(Particle &, const glm::vec2 &)> set_pos,
                         std::function<void(Particle &, const glm::vec2 &)> set_vel,
                         const Soil &soil);
+
+  glm::vec2 wrap_position(const glm::vec2 &pos);
+
+  glm::vec2 calculate_wrapped_distance(const glm::vec2 &pos1, const glm::vec2 &pos2);
 };

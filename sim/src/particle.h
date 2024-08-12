@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <random>
 
 #include "glm/glm.hpp"
@@ -16,8 +17,9 @@ struct Particle
   glm::vec2 pos_k[4];
   glm::vec2 vel_k[4];
   float mass{1.0f};
+  int grid_id{0};
 
-  Particle(glm::vec2 spawn, std::random_device &rd, float init_mass, float init_vel)
+  Particle(glm::vec2 spawn, std::random_device &rd, float init_mass, float init_vel, float kernel_radius)
   {
     std::mt19937 gen(rd());
     mass = init_mass;
