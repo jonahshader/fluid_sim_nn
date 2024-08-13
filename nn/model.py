@@ -23,7 +23,7 @@ class SimpleCNN(nn.Module):
     self.conv3 = nn.Conv2d(32, channels, kernel_size=1)
     self.skip_con = skip_con
 
-  def forward(self, x, y=None):
+  def forward_single(self, x, y):
     x_orig = x
     # result should be (batch, channels, height-2, width-2)
     x = self.conv(x)
@@ -49,6 +49,22 @@ class SimpleCNN(nn.Module):
       loss = None
 
     return x, loss
+
+  def forward(self, x):
+    # x is of shape (batch_size, batch_depth, channels, height, width)
+    # we want to apply forward_single to (batch_size, 1, channels, height, width) batch_depth - 1 times
+
+    first = x[:, 0, :, :, :].unsqueeze(1)
+
+    steps = [first]
+    losses = []
+    for i in range(1, x.shape[1]):
+      y = x[:, i, :, :, :].unsqueeze(1)
+      step, loss = self.forward_single(steps[i], y)
+      steps.append(step)
+      losses.append(loss)
+
+    return torch.cat(steps, dim=1), losses
 
 
 def configure_optimizers(model, weight_decay, learning_rate, betas, device_type):

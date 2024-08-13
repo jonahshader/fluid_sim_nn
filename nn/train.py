@@ -14,13 +14,12 @@ from contextlib import nullcontext
 import torch
 
 from model import SimpleCNN, configure_optimizers
-from data import load_data, split_data, crop_data
+from nn.data import load_recordings, split_recordings
 
 
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
-
 eval_interval = 200
 log_interval = 10
 eval_iters = 20
@@ -36,6 +35,7 @@ out_dir = 'out_' + model_type.__name__
 # data
 dataset = '2_long'
 batch_size = 256
+batch_depth = 4
 # model
 top_kernel_size = 3
 skip_con = True
@@ -91,29 +91,33 @@ ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
 # poor man's data loader
 # current dir is fluid_sim_nn/nn, data is in fluid_sim_nn/data/{dataset}
 data_dir = os.path.join(os.path.dirname(__file__), '..', 'data', dataset)
-metadata, X, Y, normalize_transform = load_data(data_dir)
-# crop_size depends on kernel size
-crop_amount = top_kernel_size - 1
-X, Y = crop_data(X, Y, crop_size=(crop_amount, crop_amount))
+metadata, X, normalize_transform = load_recordings(data_dir)
+
+train_indices, test_indices, X = split_recordings(X, batch_depth=batch_depth)
+
 # normalize the data
 X = normalize_transform(X)
-Y = normalize_transform(Y)
-x_train, y_train, x_val, y_val = split_data(X, Y)
+
 # send to device
-x_train = x_train.to(device=device, dtype=ptdtype)
-y_train = y_train.to(device=device, dtype=ptdtype)
-x_val = x_val.to(device=device, dtype=ptdtype)
-y_val = y_val.to(device=device, dtype=ptdtype)
+X = X.to(device=device, dtype=ptdtype)
+train_indices = train_indices.to(device=device, dtype=torch.int32)
+test_indices = test_indices.to(device=device, dtype=torch.int32)
 
 
 def get_batch(split):
-  x, y = (x_train, y_train) if split == 'train' else (x_val, y_val)
-  # grab random chunk of batch size from the data
-  n = x.size(0)
-  if n <= batch_size:
-    return x, y
-  idx = torch.randint(0, n - batch_size, (1,)).item()
-  return x[idx:idx + batch_size], y[idx:idx + batch_size]
+  indices = train_indices if split == 'train' else test_indices
+  indices = indices.to(torch.int32)  # Ensure int32
+  idx = torch.randperm(len(indices), dtype=torch.int32)[:batch_size]
+  start_indices = indices[idx]
+
+  offsets = torch.arange(
+      batch_depth, device=start_indices.device, dtype=torch.int32)
+
+  batch_indices = start_indices.unsqueeze(1) + offsets
+
+  X_batch = X[batch_indices]
+
+  return X_batch
 
 
 # init these up here, can override if init_from='resume' (i.e. from a checkpoint)
@@ -146,7 +150,7 @@ elif init_from == 'resume':
   checkpoint_model_args = checkpoint['model_args']
   # force these config attributes to be equal otherwise we can't even resume training
   # the rest of the attributes (e.g. dropout) can stay as desired from command line
-  for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
+  for k in ['top_kernel_size', 'skip_con']:
     model_args[k] = checkpoint_model_args[k]
   # create the model
   model = model_type(**model_args)
@@ -187,9 +191,9 @@ def estimate_loss():
   for split in ['train', 'val']:
     losses = torch.zeros(eval_iters)
     for k in range(eval_iters):
-      X, Y = get_batch(split)
+      X = get_batch(split)
       with ctx:
-        logits, loss = model(X, Y)
+        logits, loss = model(X)
       losses[k] = loss.item()
     out[split] = losses.mean()
   model.train()
@@ -223,7 +227,6 @@ t0 = time.time()
 local_iter_num = 0  # number of iterations in the lifetime of this process
 
 while True:
-
   # determine and set the learning rate for this iteration
   lr = get_lr(iter_num) if decay_lr else learning_rate
   for param_group in optimizer.param_groups:

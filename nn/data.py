@@ -5,7 +5,7 @@ import torch
 import torchvision.transforms as transforms
 
 
-def load_data(path):
+def load_recordings(path):
   # load metadata
   with open(os.path.join(path, "metadata.json"), encoding="utf-8") as f:
     metadata = json.load(f)
@@ -50,48 +50,29 @@ def load_data(path):
   for i in range(len(starts) - 1):
     recordings.append(data[starts[i]:starts[i + 1]])
 
-  # this model takes in frame n and predicts frame n+1.
-  # construct the x and y tensors per recording, then combine
-  x = []
-  y = []
+  return metadata, recordings, normalize
+
+
+def split_recordings(recordings, test_fraction=0.1, batch_depth=4):
+  """Splits recordings into training and test sets s.t. each recording is >= batch_depth"""
+
+  # drop recordings that are too short
+  recordings = [r for r in recordings if len(r) >= batch_depth]
+
+  batch_start_indices = []
+  current_start = 0
   for recording in recordings:
-    x.append(recording[:-1])
-    y.append(recording[1:])
-  x = torch.cat(x)
-  y = torch.cat(y)
+    batch_start_indices.append(
+        current_start + np.arange(0, len(recording) - batch_depth + 1))
+    current_start += len(recording)
+  batch_start_indices = np.concatenate(batch_start_indices)
 
-  return metadata, x, y, normalize
+  # split the data
+  test_mask = np.random.rand(len(batch_start_indices)) < test_fraction
+  train_indices = batch_start_indices[~test_mask]
+  test_indices = batch_start_indices[test_mask]
 
+  # combine the recordings
+  combined_recordings = torch.cat(recordings)
 
-def crop_data(x, y, crop_size=(2, 2)):
-  # crop the data to the specified size
-  _, _, height, width = x.shape
-  crop_height, crop_width = crop_size
-  x_start = crop_width // 2
-  y_start = crop_height // 2
-  x_end = width - crop_width // 2
-  y_end = height - crop_height // 2
-  # we only want to crop the output, not the input
-  y = y[:, :, y_start:y_end, x_start:x_end]
-  return x, y
-
-
-def split_data(x, y, test_fraction=0.1):
-  n = len(x)
-  indices = np.arange(n)
-  np.random.shuffle(indices)
-  split = int(n * test_fraction)
-  test_indices = indices[:split]
-  train_indices = indices[split:]
-  return x[train_indices], y[train_indices], x[test_indices], y[test_indices]
-
-
-if __name__ == "__main__":
-  # test crop_data
-  x = torch.randn(2, 3, 4, 4)
-  y = torch.randn(2, 3, 4, 4)
-  x, y = crop_data(x, y, (2, 2))
-  assert x.shape == (2, 3, 4, 4)
-  assert y.shape == (2, 3, 2, 2)
-
-  print("All tests pass")
+  return train_indices, test_indices, combined_recordings

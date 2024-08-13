@@ -3,7 +3,6 @@ Test fluid sim nn with initial conditions from dataset.
 """
 import os
 import pygame
-from contextlib import nullcontext
 import torch
 from model import SimpleCNN
 from data import load_data
