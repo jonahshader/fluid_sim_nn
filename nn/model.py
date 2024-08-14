@@ -4,17 +4,13 @@ import torch.nn.functional as F
 import inspect
 
 
-class SimpleCNN(nn.Module):
-  def __init__(self, channels, top_kernel_size, skip_con=False, inference=False):
-    super(SimpleCNN, self).__init__()
+class SimpleCNN_BPTT(nn.Module):
+  def __init__(self, channels, top_kernel_size, skip_con=False):
+    super(SimpleCNN_BPTT, self).__init__()
     self.top_kernel_size = top_kernel_size
-    self.inference = inference
-    if inference:
-      self.conv = nn.Conv2d(channels, 32, kernel_size=top_kernel_size,
-                            padding_mode='circular', padding=1)
-    else:
-      self.conv = nn.Conv2d(
-          channels, 32, kernel_size=top_kernel_size, padding=0)
+    padding = top_kernel_size // 2
+    self.conv = nn.Conv2d(channels, 32, kernel_size=top_kernel_size,
+                          padding_mode='circular', padding=padding)
 
     self.act1 = nn.GELU()
     # fc1 is pixel-wise, so the input is 32
@@ -23,7 +19,7 @@ class SimpleCNN(nn.Module):
     self.conv3 = nn.Conv2d(32, channels, kernel_size=1)
     self.skip_con = skip_con
 
-  def forward_single(self, x, y):
+  def forward_single(self, x, y=None):
     x_orig = x
     # result should be (batch, channels, height-2, width-2)
     x = self.conv(x)
@@ -32,14 +28,7 @@ class SimpleCNN(nn.Module):
     x = self.act2(x)
     x = self.conv3(x)
 
-    # skip connection
     if self.skip_con:
-      if not self.inference:
-        # crop the original x to match the size of the new x
-        # using top_kernel_size
-        crop_amount = (self.top_kernel_size - 1) // 2
-        x_orig = x_orig[:, :, crop_amount:-
-                        crop_amount, crop_amount:-crop_amount]
       x = x + x_orig
 
     if y is not None:
@@ -52,19 +41,31 @@ class SimpleCNN(nn.Module):
 
   def forward(self, x):
     # x is of shape (batch_size, batch_depth, channels, height, width)
-    # we want to apply forward_single to (batch_size, 1, channels, height, width) batch_depth - 1 times
+    batch_size, batch_depth, channels, height, width = x.shape
 
-    first = x[:, 0, :, :, :].unsqueeze(1)
-
-    steps = [first]
+    steps = []
     losses = []
-    for i in range(1, x.shape[1]):
-      y = x[:, i, :, :, :].unsqueeze(1)
-      step, loss = self.forward_single(steps[i], y)
-      steps.append(step)
+
+    # Initial step
+    current_step = x[:, 0, :, :, :]
+    steps.append(current_step)
+
+    # Iterate through the sequence
+    for i in range(1, batch_depth):
+      target = x[:, i, :, :, :]
+      current_step, loss = self.forward_single(current_step, target)
+      steps.append(current_step)
       losses.append(loss)
 
-    return torch.cat(steps, dim=1), losses
+    # Stack all steps and losses
+    all_steps = torch.cat(steps, dim=1)
+    all_losses = torch.stack(losses) if losses else None
+
+    # Take mean of losses
+    if all_losses is not None:
+      all_losses = all_losses.mean()
+
+    return all_steps, all_losses
 
 
 def configure_optimizers(model, weight_decay, learning_rate, betas, device_type):

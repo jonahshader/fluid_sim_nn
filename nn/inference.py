@@ -4,7 +4,7 @@ Test fluid sim nn with initial conditions from dataset.
 import os
 import pygame
 import torch
-from model import SimpleCNN
+from model import SimpleCNN_BPTT
 from data import load_data
 from render_state import render_state
 
@@ -22,8 +22,8 @@ device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
 # init from a model saved in a specific directory
 ckpt_path = os.path.join(out_dir, 'ckpt.pt')
 checkpoint = torch.load(ckpt_path, map_location=device)
-model = SimpleCNN(**checkpoint['model_args'],
-                  inference=True, top_kernel_size=3)
+model = SimpleCNN_BPTT(**checkpoint['model_args'],
+                       inference=True, top_kernel_size=3)
 
 
 state_dict = checkpoint['model']

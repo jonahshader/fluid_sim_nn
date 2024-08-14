@@ -13,8 +13,8 @@ from contextlib import nullcontext
 
 import torch
 
-from model import SimpleCNN, configure_optimizers
-from nn.data import load_recordings, split_recordings
+from model import SimpleCNN_BPTT, configure_optimizers
+from data import load_recordings, split_recordings
 
 
 # -----------------------------------------------------------------------------
@@ -30,7 +30,7 @@ init_from = 'scratch'  # 'scratch' or 'resume'
 wandb_log = True  # disabled by default
 wandb_project = 'fluid_sim_nn'
 wandb_run_name = 'run' + str(time.time())
-model_type = SimpleCNN
+model_type = SimpleCNN_BPTT
 out_dir = 'out_' + model_type.__name__
 # data
 dataset = '2_long'
@@ -91,15 +91,16 @@ ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
 # poor man's data loader
 # current dir is fluid_sim_nn/nn, data is in fluid_sim_nn/data/{dataset}
 data_dir = os.path.join(os.path.dirname(__file__), '..', 'data', dataset)
-metadata, X, normalize_transform = load_recordings(data_dir)
+metadata, data, normalize_transform = load_recordings(data_dir)
 
-train_indices, test_indices, X = split_recordings(X, batch_depth=batch_depth)
+train_indices, test_indices, data = split_recordings(
+    data, batch_depth=batch_depth)
 
 # normalize the data
-X = normalize_transform(X)
+data = normalize_transform(data)
 
 # send to device
-X = X.to(device=device, dtype=ptdtype)
+data = data.to(device=device, dtype=ptdtype)
 train_indices = train_indices.to(device=device, dtype=torch.int32)
 test_indices = test_indices.to(device=device, dtype=torch.int32)
 
@@ -115,9 +116,18 @@ def get_batch(split):
 
   batch_indices = start_indices.unsqueeze(1) + offsets
 
-  X_batch = X[batch_indices]
+  X_batch = data[batch_indices]
+
+  # print(f"batch_indices: {batch_indices.shape}")
+  # print(f"X_batch: {X_batch.shape}")
+  # print(f"X: {X.shape}")
 
   return X_batch
+
+
+# for i in range(10):
+#   X = get_batch('train')
+#   print(f"X: {X.shape}")
 
 
 # init these up here, can override if init_from='resume' (i.e. from a checkpoint)
@@ -222,7 +232,7 @@ if wandb_log and master_process:
   wandb.init(project=wandb_project, name=wandb_run_name, config=config)
 
 # training loop
-X, Y = get_batch('train')  # fetch the very first batch
+X = get_batch('train')  # fetch the very first batch
 t0 = time.time()
 local_iter_num = 0  # number of iterations in the lifetime of this process
 
@@ -262,10 +272,10 @@ while True:
 
   # forward backward update, using the GradScaler if data type is float16
   with ctx:
-    logits, loss = model(X, Y)
+    logits, loss = model(X)
 
   # immediately async prefetch next batch while model is doing the forward pass on the GPU
-  X, Y = get_batch('train')
+  X = get_batch('train')
   # backward pass, with gradient scaling if training in fp16
   scaler.scale(loss).backward()
   # clip the gradient

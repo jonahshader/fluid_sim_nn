@@ -49,6 +49,7 @@ def load_recordings(path):
   recordings = []
   for i in range(len(starts) - 1):
     recordings.append(data[starts[i]:starts[i + 1]])
+  recordings.append(data[starts[-1]:])
 
   return metadata, recordings, normalize
 
@@ -58,6 +59,8 @@ def split_recordings(recordings, test_fraction=0.1, batch_depth=4):
 
   # drop recordings that are too short
   recordings = [r for r in recordings if len(r) >= batch_depth]
+
+  assert len(recordings) > 0
 
   batch_start_indices = []
   current_start = 0
@@ -71,6 +74,9 @@ def split_recordings(recordings, test_fraction=0.1, batch_depth=4):
   test_mask = np.random.rand(len(batch_start_indices)) < test_fraction
   train_indices = batch_start_indices[~test_mask]
   test_indices = batch_start_indices[test_mask]
+
+  train_indices = torch.tensor(train_indices, dtype=torch.int32)
+  test_indices = torch.tensor(test_indices, dtype=torch.int32)
 
   # combine the recordings
   combined_recordings = torch.cat(recordings)
