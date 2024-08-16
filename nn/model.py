@@ -9,14 +9,14 @@ class SimpleCNN_BPTT(nn.Module):
     super(SimpleCNN_BPTT, self).__init__()
     self.top_kernel_size = top_kernel_size
     padding = top_kernel_size // 2
-    self.conv = nn.Conv2d(channels, 32, kernel_size=top_kernel_size,
+    self.conv = nn.Conv2d(channels, 256, kernel_size=top_kernel_size,
                           padding_mode='circular', padding=padding)
 
     self.act1 = nn.GELU()
     # fc1 is pixel-wise, so the input is 32
-    self.conv2 = nn.Conv2d(32, 32, kernel_size=1)
+    self.conv2 = nn.Conv2d(256, 256, kernel_size=1)
     self.act2 = nn.GELU()
-    self.conv3 = nn.Conv2d(32, channels, kernel_size=1)
+    self.conv3 = nn.Conv2d(256, channels, kernel_size=1)
     self.skip_con = skip_con
 
   def forward_single(self, x, y=None):
@@ -48,13 +48,13 @@ class SimpleCNN_BPTT(nn.Module):
 
     # Initial step
     current_step = x[:, 0, :, :, :]
-    steps.append(current_step)
+    steps.append(current_step.unsqueeze(1))
 
     # Iterate through the sequence
     for i in range(1, batch_depth):
       target = x[:, i, :, :, :]
       current_step, loss = self.forward_single(current_step, target)
-      steps.append(current_step)
+      steps.append(current_step.unsqueeze(1))
       losses.append(loss)
 
     # Stack all steps and losses
