@@ -4,11 +4,13 @@ Test fluid sim nn with initial conditions from dataset.
 import os
 import pygame
 import torch
+import math
 from model import SimpleCNN_BPTT
 from data import load_recordings, split_recordings
 from render_state import render_state
 
-out_dir = '../models/out_SimpleCNN_BPTT'
+# out_dir = '../models/out_SimpleCNN_BPTT'
+out_dir = '../models/k_3_l'
 device = 'cuda'
 dtype = torch.float32
 compile = False
@@ -108,10 +110,29 @@ if __name__ == '__main__':
       # state[0][0] = torch.sigmoid(state[0][0])
       # state[0][1] = torch.sigmoid(state[0][1])
 
-      surface = render_state(state[:, 2:])
+      # state[0][4] *= 0.99
+      # x_vel = state[:, 0, :, :]
+      # y_vel = state[:, 1, :, :]
+      # vel = (x_vel ** 2 + y_vel ** 2).sqrt() + 0.0001
+      # angle = torch.pi / 16
+      # rotation_matrix = [[math.cos(angle), -math.sin(angle)],
+      #                    [math.sin(angle), math.cos(angle)]]
+      # rotation_matrix = torch.tensor(rotation_matrix).to(device)
+
+      # x_vel = x_vel * rotation_matrix[0, 0] + y_vel * rotation_matrix[0, 1]
+      # y_vel = x_vel * rotation_matrix[1, 0] + y_vel * rotation_matrix[1, 1]
+
+      # x_vel /= vel
+      # y_vel /= vel
+
+      state[:, 0, :, :] = x_vel
+      state[:, 1, :, :] = y_vel
+
+      # surface = render_state(state[:, 2:])
+      surface = render_state(state[:, :3])
       screen.blit(surface, (0, 0))
       # screen is larger than surface, so scale up
       pygame.transform.scale(surface, (1024, 1024), screen)
 
       pygame.display.flip()
-      clock.tick(15)
+      clock.tick(30)

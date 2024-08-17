@@ -15,7 +15,7 @@ class SimpleCNN_BPTT(nn.Module):
     self.act1 = nn.GELU()
     # fc1 is pixel-wise, so the input is 32
     self.conv2 = nn.Conv2d(256, 256, kernel_size=1)
-    self.act2 = nn.GELU()
+    self.act2 = nn.Tanh()
     self.conv3 = nn.Conv2d(256, channels, kernel_size=1)
     self.skip_con = skip_con
 
