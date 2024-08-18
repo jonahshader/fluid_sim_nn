@@ -159,7 +159,7 @@ struct Bins
   void write_wall_data(const std::filesystem::path &path, const Soil &soil)
   {
     // ensure soil uses the same grid size
-    if (soil.get_grid_width() != width || soil.get_grid_height() != height)
+    if (soil.get_wall_grid_width() != width || soil.get_wall_grid_height() != height)
     {
       std::cerr << "Soil grid size does not match bins grid size" << std::endl;
       return;

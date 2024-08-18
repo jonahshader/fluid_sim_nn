@@ -19,16 +19,18 @@ const glm::vec2 bounds = {BOUNDS_X, BOUNDS_Y};
 const glm::vec2 spawn = bounds;
 
 constexpr float KERNEL_RADIUS = 2.0f;
-constexpr int PARTICLES = static_cast<int>(7000 * BOUNDS_X * BOUNDS_Y / 128.0f / 128.0f);
+constexpr float BIN_SIZE_RATIO = 1.0f;
+constexpr float BIN_SIZE = KERNEL_RADIUS * BIN_SIZE_RATIO;
+constexpr int PARTICLES = static_cast<int>(14000 * BOUNDS_X * BOUNDS_Y / 128.0f / 128.0f);
 constexpr float PARTICLE_MASS = 1.0f;
 const glm::vec2 INIT_VEL = {0.0f, 0.0f};
 
-const std::string DATA_DIR = "4_walls";
+const std::string DATA_DIR = "5_cups";
 
 void init_sim(ParticleSystem &particles, Soil &soil, std::mt19937 &gen)
 {
   particles = ParticleSystem(spawn, bounds, PARTICLES, PARTICLE_MASS, INIT_VEL, KERNEL_RADIUS);
-  soil = Soil(bounds, KERNEL_RADIUS);
+  soil = Soil(bounds, KERNEL_RADIUS, BIN_SIZE);
   soil.populate_walls(0.25f, gen);
   particles.respawn_stuck_particles(soil, gen);
 }
@@ -46,12 +48,11 @@ int main(int argc, char *argv[])
 
   // TODO: make empty constructors for things set in init_sim
   ParticleSystem particles(spawn, bounds, PARTICLES, PARTICLE_MASS, INIT_VEL, KERNEL_RADIUS);
-  Soil soil(bounds, KERNEL_RADIUS);
-  Tools tools(soil, particles);
+  Soil soil(bounds, KERNEL_RADIUS, BIN_SIZE);
+  Tools tools(soil, particles, gen);
   init_sim(particles, soil, gen);
   long tick = 0;
 
-  float bin_size = KERNEL_RADIUS * 2;
   // float bins_x_start = bin_size * 2;
   // float bins_y_start = bin_size * 2;
   // float bins_x_end = bounds.x - bin_size * 2;
@@ -60,9 +61,9 @@ int main(int argc, char *argv[])
   float bins_y_start = 0;
   float bins_x_end = bounds.x;
   float bins_y_end = bounds.y;
-  int bins_x = std::floor((bins_x_end - bins_x_start) / bin_size);
-  int bins_y = std::floor((bins_y_end - bins_y_start) / bin_size);
-  Bins bins{bin_size, {bins_x_start, bins_y_start}, bins_x, bins_y};
+  int bins_x = std::floor((bins_x_end - bins_x_start) / BIN_SIZE);
+  int bins_y = std::floor((bins_y_end - bins_y_start) / BIN_SIZE);
+  Bins bins{BIN_SIZE, {bins_x_start, bins_y_start}, bins_x, bins_y};
   Bins bins_render = bins;
 
   bool paused = true;

@@ -64,13 +64,13 @@ void render_soil(const Soil &soil, SDL_Renderer *renderer, float render_scale)
   {
     if (wall_grid[i])
     {
-      int x = i % soil.get_grid_width();
-      int y = i / soil.get_grid_width();
+      int x = i % soil.get_wall_grid_width();
+      int y = i / soil.get_wall_grid_height();
       SDL_Rect rect = {
-          x * soil.get_cell_size() * render_scale,
-          y * soil.get_cell_size() * render_scale,
-          soil.get_cell_size() * render_scale,
-          soil.get_cell_size() * render_scale};
+          x * soil.get_wall_cell_size() * render_scale,
+          y * soil.get_wall_cell_size() * render_scale,
+          soil.get_wall_cell_size() * render_scale,
+          soil.get_wall_cell_size() * render_scale};
       SDL_RenderFillRect(renderer, &rect);
     }
   }
@@ -96,9 +96,9 @@ void render_soil(const Soil &soil, SDL_Renderer *renderer, float render_scale)
 
   // render grid
   SDL_SetRenderDrawColor(renderer, 127, 127, 127, 255);
-  auto grid_width = soil.get_grid_width();
-  auto grid_height = soil.get_grid_height();
-  auto cell_size = soil.get_cell_size();
+  auto grid_width = soil.get_soil_grid_width();
+  auto grid_height = soil.get_soil_grid_height();
+  auto cell_size = soil.get_soil_cell_size();
   for (int y = 0; y < grid_height; ++y)
   {
     for (int x = 0; x < grid_width; ++x)

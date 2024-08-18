@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <random>
 
 #include "SDL.h"
 #include "glm/glm.hpp"
@@ -30,7 +31,7 @@ struct Tool
 class Tools
 {
 public:
-  Tools(Soil &soil, ParticleSystem &particles);
+  Tools(Soil &soil, ParticleSystem &particles, std::mt19937 &gen);
 
   void update(const SDL_Event &event, float render_scale, float dt);
   void render(SDL_Renderer *renderer, float render_scale);

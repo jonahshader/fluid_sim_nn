@@ -14,7 +14,7 @@ void Tools::set_tool_index(int index)
   std::cout << "Selected tool: " << tools[tool_index].name << std::endl;
 }
 
-Tools::Tools(Soil &soil, ParticleSystem &particles)
+Tools::Tools(Soil &soil, ParticleSystem &particles, std::mt19937 &gen)
 {
   auto get_radius = [](const MouseState &mouse_state) -> float
   {
@@ -105,10 +105,12 @@ Tools::Tools(Soil &soil, ParticleSystem &particles)
                       if (event.button.button == SDL_BUTTON_LEFT)
                       {
                         soil.set_wall(pos, true);
+                        particles.respawn_stuck_particles(soil, gen);
                       }
                       else if (event.button.button == SDL_BUTTON_RIGHT)
                       {
                         soil.set_wall(pos, false);
+                        particles.respawn_stuck_particles(soil, gen);
                       }
                     } }, render_circle});
 }

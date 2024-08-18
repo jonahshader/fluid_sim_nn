@@ -80,11 +80,11 @@ if __name__ == '__main__':
   state = normalize_transform(state)
 
   # plot a histogram for each channel of state
-  # for i in range(state.shape[1]):
-  #   name = metadata['attributes'][i]
-  #   plt.hist(state[0][i].flatten().cpu().numpy(), bins=100)
-  #   plt.title(name)
-  #   plt.show()
+  for i in range(state.shape[1]):
+    name = metadata['attributes'][i]
+    plt.hist(state[0][i].flatten().cpu().numpy(), bins=100)
+    plt.title(name)
+    plt.show()
 
   with torch.set_grad_enabled(False):
     while running:
@@ -177,4 +177,4 @@ if __name__ == '__main__':
       pygame.transform.scale(surface, (1024, 1024), screen)
 
       pygame.display.flip()
-      clock.tick(30)
+      clock.tick(1200)
