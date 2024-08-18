@@ -9,7 +9,7 @@ class SimpleCNN_BPTT(nn.Module):
     super(SimpleCNN_BPTT, self).__init__()
     self.top_kernel_size = top_kernel_size
     padding = top_kernel_size // 2
-    self.conv = nn.Conv2d(channels, 256, kernel_size=top_kernel_size,
+    self.conv = nn.Conv2d(channels + 1, 256, kernel_size=top_kernel_size,
                           padding_mode='circular', padding=padding)
 
     self.act1 = nn.GELU()
@@ -19,9 +19,18 @@ class SimpleCNN_BPTT(nn.Module):
     self.conv3 = nn.Conv2d(256, channels, kernel_size=1)
     self.skip_con = skip_con
 
-  def forward_single(self, x, y=None):
+  def forward_single(self, x, y=None, walls=None):
     x_orig = x
     # result should be (batch, channels, height-2, width-2)
+
+    # add walls as a channel. walls is of shape (height, width)
+    if walls is not None:
+      walls = walls.unsqueeze(0).unsqueeze(0)
+      # repeat walls to match the batch size
+      walls = walls.repeat(x.shape[0], 1, 1, 1)
+      x = torch.cat((x, walls), dim=1)
+    else:
+      x = torch.cat((x, torch.zeros_like(x[:, 0:1, :, :])), dim=1)
     x = self.conv(x)
     x = self.act1(x)
     x = self.conv2(x)
@@ -39,7 +48,7 @@ class SimpleCNN_BPTT(nn.Module):
 
     return x, loss
 
-  def forward(self, x):
+  def forward(self, x, walls=None):
     # x is of shape (batch_size, batch_depth, channels, height, width)
     batch_size, batch_depth, channels, height, width = x.shape
 
@@ -53,7 +62,7 @@ class SimpleCNN_BPTT(nn.Module):
     # Iterate through the sequence
     for i in range(1, batch_depth):
       target = x[:, i, :, :, :]
-      current_step, loss = self.forward_single(current_step, target)
+      current_step, loss = self.forward_single(current_step, target, walls)
       steps.append(current_step.unsqueeze(1))
       losses.append(loss)
 

@@ -97,6 +97,20 @@ Tools::Tools(Soil &soil, ParticleSystem &particles)
                         }
                       }
                     } }, render_circle});
+  tools.push_back({"Add Wall", [&](const MouseState &mouse_state, const SDL_Event &event, float dt)
+                   {
+                    if (event.type == SDL_MOUSEBUTTONDOWN)
+                    {
+                      glm::vec2 pos = mouse_state.mouse_world_pos;
+                      if (event.button.button == SDL_BUTTON_LEFT)
+                      {
+                        soil.set_wall(pos, true);
+                      }
+                      else if (event.button.button == SDL_BUTTON_RIGHT)
+                      {
+                        soil.set_wall(pos, false);
+                      }
+                    } }, render_circle});
 }
 
 void Tools::update(const SDL_Event &event, float render_scale, float dt)

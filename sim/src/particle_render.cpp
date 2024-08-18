@@ -57,7 +57,25 @@ void render_velocity(const ParticleSystem &ps, SDL_Renderer *renderer, float ren
 void render_soil(const Soil &soil, SDL_Renderer *renderer, float render_scale)
 {
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-  for (const auto &cell : soil.get_grid())
+
+  // render walls first
+  const auto &wall_grid = soil.get_wall_grid();
+  for (int i = 0; i < wall_grid.size(); ++i)
+  {
+    if (wall_grid[i])
+    {
+      int x = i % soil.get_grid_width();
+      int y = i / soil.get_grid_width();
+      SDL_Rect rect = {
+          x * soil.get_cell_size() * render_scale,
+          y * soil.get_cell_size() * render_scale,
+          soil.get_cell_size() * render_scale,
+          soil.get_cell_size() * render_scale};
+      SDL_RenderFillRect(renderer, &rect);
+    }
+  }
+
+  for (const auto &cell : soil.get_soil_grid())
   {
     for (const auto &particle : cell)
     {

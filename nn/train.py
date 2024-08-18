@@ -33,7 +33,7 @@ wandb_run_name = 'run' + str(time.time())
 model_type = SimpleCNN_BPTT
 out_dir = 'out_' + model_type.__name__
 # data
-dataset = '2_long'
+dataset = '4_walls'
 batch_size = 256
 batch_depth = 4
 # model
@@ -91,7 +91,7 @@ ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
 # poor man's data loader
 # current dir is fluid_sim_nn/nn, data is in fluid_sim_nn/data/{dataset}
 data_dir = os.path.join(os.path.dirname(__file__), '..', 'data', dataset)
-metadata, data, normalize_transform = load_recordings(data_dir)
+metadata, data, normalize_transform, wall_data = load_recordings(data_dir)
 
 train_indices, test_indices, data = split_recordings(
     data, batch_depth=batch_depth)
@@ -101,6 +101,7 @@ data = normalize_transform(data)
 
 # send to device
 data = data.to(device=device, dtype=ptdtype)
+wall_data = wall_data.to(device=device, dtype=ptdtype)
 train_indices = train_indices.to(device=device, dtype=torch.int32)
 test_indices = test_indices.to(device=device, dtype=torch.int32)
 
@@ -203,7 +204,7 @@ def estimate_loss():
     for k in range(eval_iters):
       X = get_batch(split)
       with ctx:
-        logits, loss = model(X)
+        logits, loss = model(X, walls=wall_data)
       losses[k] = loss.item()
     out[split] = losses.mean()
   model.train()
@@ -272,7 +273,7 @@ while True:
 
   # forward backward update, using the GradScaler if data type is float16
   with ctx:
-    logits, loss = model(X)
+    logits, loss = model(X, walls=wall_data)
 
   # immediately async prefetch next batch while model is doing the forward pass on the GPU
   X = get_batch('train')

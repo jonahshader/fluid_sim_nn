@@ -9,6 +9,8 @@
 
 #include "glm/glm.hpp"
 
+#include "soil.h"
+
 struct Bin
 {
   glm::vec2 vel{0.0f, 0.0f};
@@ -152,5 +154,25 @@ struct Bins
       }
     }
     // skip soil data for now
+  }
+
+  void write_wall_data(const std::filesystem::path &path, const Soil &soil)
+  {
+    // ensure soil uses the same grid size
+    if (soil.get_grid_width() != width || soil.get_grid_height() != height)
+    {
+      std::cerr << "Soil grid size does not match bins grid size" << std::endl;
+      return;
+    }
+
+    std::ofstream file(path / "wall_data.bin", std::ios::binary);
+    for (int y = 0; y < height; ++y)
+    {
+      for (int x = 0; x < width; ++x)
+      {
+        bool wall = soil.get_wall({start.x + x * bin_size, start.y + y * bin_size});
+        file.write(reinterpret_cast<const char *>(&wall), sizeof(bool));
+      }
+    }
   }
 };

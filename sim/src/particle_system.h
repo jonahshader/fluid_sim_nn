@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <vector>
+#include <random>
 
 #include "glm/glm.hpp"
 
@@ -20,6 +21,7 @@ public:
 
   void update(float dt);
   void update_rk4(const Soil &soil, float dt);
+  void respawn_stuck_particles(const Soil &soil, std::mt19937 &gen);
 
   void populate_bins(Bins &bins_);
 

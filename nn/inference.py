@@ -4,17 +4,18 @@ Test fluid sim nn with initial conditions from dataset.
 import os
 import pygame
 import torch
+from matplotlib import pyplot as plt
 import math
 from model import SimpleCNN_BPTT
 from data import load_recordings, split_recordings
 from render_state import render_state
 
 # out_dir = '../models/out_SimpleCNN_BPTT'
-out_dir = '../models/k_3_l'
+out_dir = '../models/4_walls_model'
 device = 'cuda'
 dtype = torch.float32
 compile = False
-dataset = '3_wrap'
+dataset = '4_walls'
 # overrides from command line or config file
 exec(open('configurator.py').read())
 
@@ -43,11 +44,12 @@ if compile:
 
 # load the dataset
 data_dir = os.path.join(os.path.dirname(__file__), '..', 'data', dataset)
-metadata, data, normalize_transform = load_recordings(data_dir)
+metadata, data, normalize_transform, wall_data = load_recordings(data_dir)
 # grab first recording
 data = data[0]
 # send to device
 data = data.to(device, dtype=dtype)
+wall_data = wall_data.to(device, dtype=dtype)
 
 
 if __name__ == '__main__':
@@ -68,27 +70,62 @@ if __name__ == '__main__':
   total_density = state[0][4].sum()
 
   # extend the width and height of the state with zeros to match the screen
-  state = torch.nn.functional.pad(state, (0, 256 - width, 0, 256 - height))
+  s = 128
+  state = torch.nn.functional.pad(state, (0, s - width, 0, s - height))
+  # repeat the wall data to match the screen
+  repetitions = (s // wall_data.shape[0], s // wall_data.shape[1])
+  # wall_data = wall_data.repeat(repetitions[0], repetitions[1])
+  wall_data = torch.nn.functional.pad(wall_data, (0, s - width, 0, s - height))
   # normalize the state
   state = normalize_transform(state)
+
+  # plot a histogram for each channel of state
+  # for i in range(state.shape[1]):
+  #   name = metadata['attributes'][i]
+  #   plt.hist(state[0][i].flatten().cpu().numpy(), bins=100)
+  #   plt.title(name)
+  #   plt.show()
+
   with torch.set_grad_enabled(False):
     while running:
       for event in pygame.event.get():
         if event.type == pygame.QUIT:
           running = False
       screen.fill((0, 0, 0))
+
+      # draw walls on mouse click & drag
+      x, y = pygame.mouse.get_pos()
+      x = x * s // pygame.display.get_window_size()[0]
+      y = y * s // pygame.display.get_window_size()[1]
+      if pygame.mouse.get_pressed()[0]:
+        wall_data[y, x] = 1
+      elif pygame.mouse.get_pressed()[2]:
+        wall_data[y, x] = 0
+
       # TODO: this is a hack to get the state to the right shape
       # model needs (1, 2, channels, height, width)
       # current shape is (1, channels, height, width)
       state = state.unsqueeze(0)  # (1, 1, channels, height, width)
       state = state.repeat(1, 2, 1, 1, 1)  # (1, 2, channels, height, width)
-      print(f"state shape: {state.shape}")
 
-      state, _ = model(state)
-      print(f"state shape: {state.shape}")
+      state, _ = model(state, walls=wall_data)
       # undo the shape manipulation
       # state = state.squeeze(0)
       state = state[:, 1, :, :, :]
+
+      # zero out the state where the wall is
+      state = state * (1 - wall_data)
+
+      # limit x_vel to +/- 10
+      state[0][0] = torch.clamp(state[0][0], -10, 10)
+      # limit y_vel to +/- 10
+      state[0][1] = torch.clamp(state[0][1], -10, 10)
+      # limit avg_vel to [0, 8]
+      state[0][2] = torch.clamp(state[0][2], 0, 8)
+      # limit kinetic energy to 0, 15
+      state[0][3] = torch.clamp(state[0][3], 0, 15)
+      # limit density to -1, 2
+      state[0][4] = torch.clamp(state[0][4], -1, 2)
 
       # fix the density, kinetic energy, avg vel
       current_total_density = state[0][4].sum()
@@ -111,6 +148,11 @@ if __name__ == '__main__':
       # state[0][1] = torch.sigmoid(state[0][1])
 
       # state[0][4] *= 0.99
+      # state *= 0.99
+
+      # apply tanh to state
+      # state = torch.tanh(state * 1.01)
+
       # x_vel = state[:, 0, :, :]
       # y_vel = state[:, 1, :, :]
       # vel = (x_vel ** 2 + y_vel ** 2).sqrt() + 0.0001
@@ -125,8 +167,8 @@ if __name__ == '__main__':
       # x_vel /= vel
       # y_vel /= vel
 
-      state[:, 0, :, :] = x_vel
-      state[:, 1, :, :] = y_vel
+      # state[:, 0, :, :] = x_vel
+      # state[:, 1, :, :] = y_vel
 
       # surface = render_state(state[:, 2:])
       surface = render_state(state[:, :3])

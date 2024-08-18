@@ -9,23 +9,28 @@
 
 #include <filesystem>
 #include <iostream>
+#include <random>
 
 #include <string>
 
-const glm::vec2 bounds = {128.0f, 128.0f};
+constexpr float BOUNDS_X = 256.0f;
+constexpr float BOUNDS_Y = 256.0f;
+const glm::vec2 bounds = {BOUNDS_X, BOUNDS_Y};
 const glm::vec2 spawn = bounds;
 
 constexpr float KERNEL_RADIUS = 2.0f;
-constexpr int PARTICLES = 7000;
+constexpr int PARTICLES = static_cast<int>(7000 * BOUNDS_X * BOUNDS_Y / 128.0f / 128.0f);
 constexpr float PARTICLE_MASS = 1.0f;
-const glm::vec2 INIT_VEL = {0.0f, -100.0f};
+const glm::vec2 INIT_VEL = {0.0f, 0.0f};
 
-const std::string DATA_DIR = "3_wrap";
+const std::string DATA_DIR = "4_walls";
 
-void init_sim(ParticleSystem &particles, Soil &soil)
+void init_sim(ParticleSystem &particles, Soil &soil, std::mt19937 &gen)
 {
   particles = ParticleSystem(spawn, bounds, PARTICLES, PARTICLE_MASS, INIT_VEL, KERNEL_RADIUS);
   soil = Soil(bounds, KERNEL_RADIUS);
+  soil.populate_walls(0.25f, gen);
+  particles.respawn_stuck_particles(soil, gen);
 }
 
 int main(int argc, char *argv[])
@@ -35,9 +40,15 @@ int main(int argc, char *argv[])
   SDL_Renderer *renderer;
   SDL_Surface *surface;
   SDL_Event event;
+
+  std::random_device rd;
+  std::mt19937 gen(rd());
+
+  // TODO: make empty constructors for things set in init_sim
   ParticleSystem particles(spawn, bounds, PARTICLES, PARTICLE_MASS, INIT_VEL, KERNEL_RADIUS);
   Soil soil(bounds, KERNEL_RADIUS);
   Tools tools(soil, particles);
+  init_sim(particles, soil, gen);
   long tick = 0;
 
   float bin_size = KERNEL_RADIUS * 2;
@@ -98,7 +109,7 @@ int main(int argc, char *argv[])
       }
       else if (event.key.keysym.sym == SDLK_r)
       {
-        init_sim(particles, soil);
+        init_sim(particles, soil, gen);
       }
       else if (event.key.keysym.sym == SDLK_s)
       {
@@ -108,6 +119,7 @@ int main(int argc, char *argv[])
           std::cout << "recording started" << std::endl;
           // write metadata
           bins.write_metadata_json(data_dir);
+          bins.write_wall_data(data_dir, soil);
         }
         else
         {
@@ -132,10 +144,10 @@ int main(int argc, char *argv[])
       particles.update_rk4(soil, DT);
       ++tick;
       particles.populate_bins(bins);
-      // if (tick % 2 == 0)
+      if (tick % 2 == 0)
       {
         bins.compute_averages();
-        bins.print_stats();
+        // bins.print_stats();
         if (recording)
         {
           bins.write_to_file(data_dir, frame);

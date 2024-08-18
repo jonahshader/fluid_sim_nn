@@ -34,6 +34,9 @@ def render_state(state):
   state = np.moveaxis(state, 0, -1)
   # state now has the shape (height, width, channels)
 
+  # transpose height and width
+  state = np.transpose(state, (1, 0, 2))
+
   # convert to pygame surface
   pygame.surfarray.blit_array(surface, state)
 

@@ -282,8 +282,50 @@ void ParticleSystem::update_rk4(const Soil &soil, float dt)
   for (int i = 0; i < particles.size(); ++i)
   {
     glm::vec2 new_pos = particles[i].old_pos + (dt / 6.0f) * (particles[i].pos_k[0] + 2.0f * particles[i].pos_k[1] + 2.0f * particles[i].pos_k[2] + particles[i].pos_k[3]);
-    particles[i].pos = wrap_position(new_pos);
-    particles[i].vel = particles[i].old_vel + (dt / 6.0f) * (particles[i].vel_k[0] + 2.0f * particles[i].vel_k[1] + 2.0f * particles[i].vel_k[2] + particles[i].vel_k[3]);
+    glm::vec2 new_vel = particles[i].old_vel + (dt / 6.0f) * (particles[i].vel_k[0] + 2.0f * particles[i].vel_k[1] + 2.0f * particles[i].vel_k[2] + particles[i].vel_k[3]);
+
+    // move out of walls
+    auto new_pos_temp = wrap_position(new_pos);
+    auto new_vel_temp = new_vel;
+    if (soil.get_wall(new_pos_temp))
+    {
+      // try fixing x first
+      new_pos_temp.x = particles[i].old_pos.x;
+      new_vel_temp.x = 0.0f;
+      if (soil.get_wall(new_pos_temp))
+      {
+        // try fixing just y
+        new_pos_temp.x = new_pos.x;
+        new_vel_temp.x = new_vel.x;
+        new_pos_temp.y = particles[i].old_pos.y;
+        new_vel_temp.y = 0.0f;
+        if (soil.get_wall(new_pos_temp))
+        {
+          // both x and y are stuck, just reset to old pos
+          new_pos_temp = particles[i].old_pos;
+          new_vel_temp = particles[i].old_vel;
+        }
+      }
+    }
+
+    particles[i].pos = new_pos_temp;
+    particles[i].vel = new_vel_temp;
+  }
+}
+
+void ParticleSystem::respawn_stuck_particles(const Soil &soil, std::mt19937 &gen)
+{
+  std::uniform_real_distribution<float> dist_x(0.0f, bounds.x);
+  std::uniform_real_distribution<float> dist_y(0.0f, bounds.y);
+
+  // keep randomizing until particles are not stuck
+  for (auto &p : particles)
+  {
+    while (soil.get_wall(p.pos))
+    {
+      p.pos = glm::vec2(dist_x(gen), dist_y(gen));
+      p.vel = glm::vec2(0.0f, 0.0f);
+    }
   }
 }
 

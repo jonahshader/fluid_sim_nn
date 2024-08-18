@@ -51,7 +51,16 @@ def load_recordings(path):
     recordings.append(data[starts[i]:starts[i + 1]])
   recordings.append(data[starts[-1]:])
 
-  return metadata, recordings, normalize
+  # load wall_data.bin
+  # this is a single frame that contains the wall data, which is boolean mask, stored as bytes
+  with open(os.path.join(path, "wall_data.bin"), "rb") as f:
+    wall_data = np.fromfile(f, dtype=np.uint8)
+  # convert to float tensor
+  wall_data = torch.tensor(wall_data, dtype=torch.float32)
+  # reshape to match the metadata
+  wall_data = wall_data.reshape(height, width)
+
+  return metadata, recordings, normalize, wall_data
 
 
 def split_recordings(recordings, test_fraction=0.1, batch_depth=4):
