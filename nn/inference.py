@@ -11,11 +11,11 @@ from data import load_recordings, split_recordings
 from render_state import render_state
 
 # out_dir = '../models/out_SimpleCNN_BPTT'
-out_dir = '../models/4_walls_model'
+out_dir = '../models/5_cups_1_model'
 device = 'cuda'
 dtype = torch.float32
 compile = False
-dataset = '4_walls'
+dataset = '5_cups'
 # overrides from command line or config file
 exec(open('configurator.py').read())
 
@@ -76,6 +76,7 @@ if __name__ == '__main__':
   repetitions = (s // wall_data.shape[0], s // wall_data.shape[1])
   # wall_data = wall_data.repeat(repetitions[0], repetitions[1])
   wall_data = torch.nn.functional.pad(wall_data, (0, s - width, 0, s - height))
+  # wall_data *= 0
   # normalize the state
   state = normalize_transform(state)
 
@@ -117,15 +118,15 @@ if __name__ == '__main__':
       state = state * (1 - wall_data)
 
       # limit x_vel to +/- 10
-      state[0][0] = torch.clamp(state[0][0], -10, 10)
+      state[0][0] = torch.clamp(state[0][0], -20, 20)
       # limit y_vel to +/- 10
-      state[0][1] = torch.clamp(state[0][1], -10, 10)
+      state[0][1] = torch.clamp(state[0][1], -20, 20)
       # limit avg_vel to [0, 8]
-      state[0][2] = torch.clamp(state[0][2], 0, 8)
+      state[0][2] = torch.clamp(state[0][2], -0.5, 15)
       # limit kinetic energy to 0, 15
-      state[0][3] = torch.clamp(state[0][3], 0, 15)
+      state[0][3] = torch.clamp(state[0][3], 0, 40)
       # limit density to -1, 2
-      state[0][4] = torch.clamp(state[0][4], -1, 2)
+      state[0][4] = torch.clamp(state[0][4], -0.8, 2)
 
       # fix the density, kinetic energy, avg vel
       current_total_density = state[0][4].sum()
@@ -147,8 +148,11 @@ if __name__ == '__main__':
       # state[0][0] = torch.sigmoid(state[0][0])
       # state[0][1] = torch.sigmoid(state[0][1])
 
-      # state[0][4] *= 0.99
-      # state *= 0.99
+      # state[0][0] *= 0.9
+      # state[0][1] *= 0.99
+      state[0][2] *= 1.01
+      state[0][3] *= 1.01
+      state[0][4] *= 1.01
 
       # apply tanh to state
       # state = torch.tanh(state * 1.01)
@@ -170,8 +174,8 @@ if __name__ == '__main__':
       # state[:, 0, :, :] = x_vel
       # state[:, 1, :, :] = y_vel
 
-      # surface = render_state(state[:, 2:])
-      surface = render_state(state[:, :3])
+      surface = render_state(state[:, 2:])
+      # surface = render_state(state[:, :3])
       screen.blit(surface, (0, 0))
       # screen is larger than surface, so scale up
       pygame.transform.scale(surface, (1024, 1024), screen)
