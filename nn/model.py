@@ -21,7 +21,7 @@ class SimpleCNN_BPTT(nn.Module):
 
   def forward_single(self, x, y=None, walls=None):
     x_orig = x
-    # result should be (batch, channels, height-2, width-2)
+    # result should be (batch, channels, height, width)
 
     # add walls as a channel. walls is of shape (height, width)
     if walls is not None:
@@ -63,6 +63,85 @@ class SimpleCNN_BPTT(nn.Module):
     for i in range(1, batch_depth):
       target = x[:, i, :, :, :]
       current_step, loss = self.forward_single(current_step, target, walls)
+      steps.append(current_step.unsqueeze(1))
+      losses.append(loss)
+
+    # Stack all steps and losses
+    all_steps = torch.cat(steps, dim=1)
+    all_losses = torch.stack(losses) if losses else None
+
+    # Take mean of losses
+    if all_losses is not None:
+      all_losses = all_losses.mean()
+
+    return all_steps, all_losses
+
+
+class NearestNeighbor(nn.Module):
+  """Performs nearest neighbor on 3x3 kernels of a subset of the data to "lookup" the next value per kernel.
+  Operates on normalized data."""
+
+  def __init__(self, data, top_kernel_size):
+    super(NearestNeighbor, self).__init__()
+    padding = top_kernel_size // 2
+    
+    # unfold the data to get top_kernel_size^2 kernels
+    # assuming data is of shape (batch_size, channels, height, width)
+
+    # manually apply circular padding (F.unfold only supports zero padding)
+    padded = F.pad(data, (padding, padding, padding, padding), mode='circular')
+
+    # unfold the data to get top_kernel_size^2 kernels
+    unfolded = F.unfold(padded, kernel_size=top_kernel_size, padding=0)
+    self.unfolded = nn.Parameter(unfolded, requires_grad=False)
+
+  def forward_single(self, x, y=None):
+    # x is of shape (batch_size, channels, height, width)
+    # y is of shape (batch_size, channels, height, width)
+    batch_size, channels, height, width = x.shape
+
+    # unfold the input to get top_kernel_size^2 kernels
+    x_unfolded = F.unfold(x, kernel_size=self.top_kernel_size, padding=0)
+
+    # compute the distance between each kernel in x and the unfolded data
+    # distance is of shape (batch_size, top_kernel_size^2, height*width)
+    distance = torch.cdist(x_unfolded.transpose(1, 2), self.unfolded.transpose(1, 2))
+
+    # get the index of the minimum distance for each kernel
+    # index is of shape (batch_size, top_kernel_size^2)
+    index = distance.argmin(dim=2)
+
+    # get the value of the minimum distance for each kernel
+    # value is of shape (batch_size, top_kernel_size^2, channels)
+    value = self.unfolded[:, index, :].transpose(1, 2).view(batch_size, channels, self.top_kernel_size**2)
+
+    # reshape the value to get the output
+    # output is of shape (batch_size, channels, height, width)
+    output = value.view(batch_size, channels, height, width)
+
+    if y is not None:
+      # compute the loss
+      loss = F.mse_loss(output, y)
+    else:
+      loss = None
+
+    return output, loss
+  
+  def forward(self, x):
+    # x is of shape (batch_size, batch_depth, channels, height, width)
+    batch_size, batch_depth, channels, height, width = x.shape
+
+    steps = []
+    losses = []
+
+    # Initial step
+    current_step = x[:, 0, :, :, :]
+    steps.append(current_step.unsqueeze(1))
+
+    # Iterate through the sequence
+    for i in range(1, batch_depth):
+      target = x[:, i, :, :, :]
+      current_step, loss = self.forward_single(current_step, target)
       steps.append(current_step.unsqueeze(1))
       losses.append(loss)
 
