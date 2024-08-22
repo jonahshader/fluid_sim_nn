@@ -52,6 +52,83 @@ data = data.to(device, dtype=dtype)
 wall_data = wall_data.to(device, dtype=dtype)
 
 
+class ModelInference:
+  def __init__(self, model, state: torch.tensor, walls: torch.tensor, screen_size=(1024, 1024)):
+    """State should be of shape (N, C, H, W)"""
+    pygame.init()
+
+    assert len(state.shape) == 4
+    self.size = (state.shape[-1], state.shape[-2])
+    self.screen_size = screen_size
+
+    self.model = model
+    self.walls = walls
+
+    if walls:
+      walls_size = (walls.shape[-1], walls.shape[-2])
+      assert walls_size == self.size
+      assert len(walls_size.shape) == 2
+
+    self.screen: pygame.Surface = pygame.display.set_mode(screen_size)
+    self.clock = pygame.time.Clock()
+
+    self.post_process = lambda s: s
+    self.state_to_rgb = lambda s: s[:, 2:]
+
+  def run(self):
+    with torch.no_grad():
+      while self.step():
+        pass
+
+  def step(self):
+    for event in pygame.event.get():
+      if event.type == pygame.QUIT:
+        return False
+    self.screen.fill((0, 0, 0))
+
+    # draw walls on mouse click & drag
+    x, y = pygame.mouse.get_pos()
+    x = x * s // pygame.display.get_window_size()[0]
+    y = y * s // pygame.display.get_window_size()[1]
+    # confine to window
+    x = min(x, pygame.display.get_window_size()[0] - 1)
+    y = min(y, pygame.display.get_window_size()[1] - 1)
+    if pygame.mouse.get_pressed()[0]:
+      wall_data[y, x] = 1
+    elif pygame.mouse.get_pressed()[2]:
+      wall_data[y, x] = 0
+
+    # TODO: this is a hack to get the state to the right shape
+    # model needs (1, 2, channels, height, width)
+    # current shape is (1, channels, height, width)
+    self.state = self.state.unsqueeze(0)  # (1, 1, channels, height, width)
+    # (1, 2, channels, height, width)
+    self.state = self.state.repeat(1, 2, 1, 1, 1)
+    self.state, _ = self.model(self.state, walls=self.walls)
+    # undo the shape manipulation
+    self.state = self.state[:, 1, :, :, :]
+
+    # zero out the wall positions
+    self.state = self.state * (1 - self.walls)
+
+    # run post_process
+    self.state = self.post_process(self.state)
+
+    # render and display state
+    surface = render_state(self.state_to_rgb(self.state))
+    self.screen.blit(surface, (0, 0))
+    pygame.transform.scale(surface, self.screen_size)
+    pygame.display.flip()
+    self.clock.tick(60)
+    return True
+
+  def set_post_process(self, post_process):
+    self.post_process = post_process
+
+  def set_state_to_rgb(self, state_to_rgb):
+    self.state_to_rgb = state_to_rgb
+
+
 if __name__ == '__main__':
   # setup pygame render loop, using render_state
   # we only want to pull from data for the initial state. the model will predict the rest iteratively.
@@ -87,7 +164,7 @@ if __name__ == '__main__':
     plt.title(name)
     plt.show()
 
-  with torch.set_grad_enabled(False):
+  with torch.no_grad():
     while running:
       for event in pygame.event.get():
         if event.type == pygame.QUIT:
