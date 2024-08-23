@@ -81,55 +81,115 @@ class NearestNeighbor(nn.Module):
   """Performs nearest neighbor on 3x3 kernels of a subset of the data to "lookup" the next value per kernel.
   Operates on normalized data."""
 
-  def __init__(self, data, top_kernel_size):
+  def __init__(self, recording, walls, top_kernel_size):
     super(NearestNeighbor, self).__init__()
+    assert len(recording.shape) == 4
     padding = top_kernel_size // 2
-    
-    # unfold the data to get top_kernel_size^2 kernels
+    self.top_kernel_size = top_kernel_size
+
+    # add walls as a channel. walls is of shape (height, width)
+    self.walls = walls.unsqueeze(0).unsqueeze(0)
+    # repeat walls to match the batch size
+    walls_repeated = self.walls.repeat(recording.shape[0], 1, 1, 1)
+    recording = torch.cat((recording, walls_repeated), dim=1)
+
+    batch_size, channels, height, width = recording.shape
+
     # assuming data is of shape (batch_size, channels, height, width)
 
     # manually apply circular padding (F.unfold only supports zero padding)
-    padded = F.pad(data, (padding, padding, padding, padding), mode='circular')
+    padded = F.pad(recording, (padding, padding,
+                   padding, padding), mode='circular')
 
-    # unfold the data to get top_kernel_size^2 kernels
+    # unfold the data to get width*height kernels
     unfolded = F.unfold(padded, kernel_size=top_kernel_size, padding=0)
+    # unfold produces a tensor of shape (batch_size, channels*top_kernel_size^2, height*width)
+    # we want (batch_size * height * width, channels*top_kernel_size^2)
+    unfolded = unfolded.transpose(1, 2).reshape(
+        batch_size * height * width, channels * top_kernel_size**2)
     self.unfolded = nn.Parameter(unfolded, requires_grad=False)
+    self.walls = nn.Parameter(self.walls, requires_grad=False)
 
   def forward_single(self, x, y=None):
     # x is of shape (batch_size, channels, height, width)
     # y is of shape (batch_size, channels, height, width)
+
     batch_size, channels, height, width = x.shape
+    padding = self.top_kernel_size // 2
 
-    # unfold the input to get top_kernel_size^2 kernels
+    # manually apply circular padding (F.unfold only supports zero padding)
+    x = F.pad(x, (padding, padding, padding, padding), mode='circular')
+
+    # unfold the input to get width*height kernels
     x_unfolded = F.unfold(x, kernel_size=self.top_kernel_size, padding=0)
+    # unfold produces a tensor of shape (batch_size, channels*top_kernel_size^2, height*width)
+    # we want (batch_size, height * width, channels*top_kernel_size^2)
+    x_unfolded = x_unfolded.transpose(1, 2).reshape(
+        batch_size, height * width, channels * self.top_kernel_size**2)
 
-    # compute the distance between each kernel in x and the unfolded data
-    # distance is of shape (batch_size, top_kernel_size^2, height*width)
-    distance = torch.cdist(x_unfolded.transpose(1, 2), self.unfolded.transpose(1, 2))
+    # don't include last batch of unfolded
+    unfolded = self.unfolded[:-height*width]
+    unfolded_target = self.unfolded[height*width:]
+
+    # we want to compute the distance between each kernel in x and each kernel in self.unfolded,
+    # so we need to repeat self.unfolded to match the batch size
+    unfolded = unfolded.repeat(batch_size, 1, 1)
+
+    # compute the distance between each kernel in x and each kernel in self.unfolded
+    # distance is of shape (batch_size, height*width, height*width)
+    distance = torch.cdist(x_unfolded, unfolded, p=2)
+
+    # add a bit of noise to break ties
+    # distance += torch.rand_like(distance)
 
     # get the index of the minimum distance for each kernel
-    # index is of shape (batch_size, top_kernel_size^2)
+    # index is of shape (batch_size, height*width)
     index = distance.argmin(dim=2)
 
     # get the value of the minimum distance for each kernel
-    # value is of shape (batch_size, top_kernel_size^2, channels)
-    value = self.unfolded[:, index, :].transpose(1, 2).view(batch_size, channels, self.top_kernel_size**2)
+    value = unfolded_target[index]
+    # value is of shape (batch_size, height*width, channels*top_kernel_size^2)
+    # we want (batch_size, height*width, channels), grabbing the middle of the kernel
+    middle = self.top_kernel_size**2 // 2
+    # value = value[:, :, middle * channels:(middle + 1) * channels]
+    # value = value.reshape(batch_size, height * width,
+    #                       self.top_kernel_size**2, channels)
+    # value = value[:, :, middle, :].squeeze(2)
 
-    # reshape the value to get the output
-    # output is of shape (batch_size, channels, height, width)
-    output = value.view(batch_size, channels, height, width)
+    value = value.reshape(batch_size, height * width,
+                          channels, self.top_kernel_size**2)
+    value = value[:, :, :, middle].squeeze(2)
+
+    # reshape value to match the input shape
+    # value is of shape (batch_size, height*width, channels)
+    # need to transpose first to get (batch_size, channels, height*width)
+    value = value.transpose(1, 2)
+    # then reshape to get (batch_size, channels, height, width)
+    value = value.reshape(batch_size, channels, height, width)
 
     if y is not None:
       # compute the loss
-      loss = F.mse_loss(output, y)
+      loss = F.mse_loss(value, y)
     else:
       loss = None
 
-    return output, loss
-  
-  def forward(self, x):
+    return value, loss
+
+  def forward(self, x, walls=None):
     # x is of shape (batch_size, batch_depth, channels, height, width)
     batch_size, batch_depth, channels, height, width = x.shape
+
+    # add walls as a channel. walls is of shape (height, width)
+    if walls is not None:
+      walls_repeated = walls.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+      # repeat walls to match the batch size and batch depth
+      walls_repeated = walls_repeated.repeat(batch_size, batch_depth, 1, 1, 1)
+      x = torch.cat((x, walls_repeated), dim=2)
+    elif self.walls is not None:
+      walls_repeated = self.walls.unsqueeze(0)
+      # repeat walls to match the batch size and batch depth
+      walls_repeated = walls_repeated.repeat(batch_size, batch_depth, 1, 1, 1)
+      x = torch.cat((x, walls_repeated), dim=2)
 
     steps = []
     losses = []
@@ -152,6 +212,9 @@ class NearestNeighbor(nn.Module):
     # Take mean of losses
     if all_losses is not None:
       all_losses = all_losses.mean()
+
+    # pull out wall channel
+    all_steps = all_steps[:, :, :-1, :, :]
 
     return all_steps, all_losses
 
